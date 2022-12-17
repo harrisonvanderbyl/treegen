@@ -9,20 +9,20 @@
 class TreeGen : public DuoMesh {
 	GDCLASS(TreeGen, DuoMesh)
 private:
-	int sections = 2;
+	int sections = 3;
 	float distribution = 0.5;
 	float auto_split = 0.5;
 	PackedVector3Array splits = PackedVector3Array();
 	Array sid = Array();
 	Array sidL = Array();
 	float rotation = 0;
-	float radius_scale = 2.0;
+	float radius_scale = 1.0;
 	float radius_mult = 0.5;
 	float radius = 1.0;
-	float height = 20.0;
-	float width = 30.0;
+	float height = 2.0;
+	float width = 3.0;
 	int radial_segments = 10;
-	int rings = 0;
+	int rings = 3;
 	float leafScale = 2.0;
 
 	Array transforms;

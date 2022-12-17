@@ -21,10 +21,6 @@ void TreeGen::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("createTree"), &TreeGen::createTree);
 	ClassDB::bind_method(D_METHOD("set_radius", "radius"), &TreeGen::set_radius);
 	ClassDB::bind_method(D_METHOD("get_radius"), &TreeGen::get_radius);
-	ClassDB::bind_method(D_METHOD("set_height", "height"), &TreeGen::set_height);
-	ClassDB::bind_method(D_METHOD("get_height"), &TreeGen::get_height);
-	ClassDB::bind_method(D_METHOD("set_width", "width"), &TreeGen::set_width);
-	ClassDB::bind_method(D_METHOD("get_width"), &TreeGen::get_width);
 	ClassDB::bind_method(D_METHOD("set_radial_segments", "segments"), &TreeGen::set_radial_segments);
 	ClassDB::bind_method(D_METHOD("get_radial_segments"), &TreeGen::get_radial_segments);
 	ClassDB::bind_method(D_METHOD("set_rings", "rings"), &TreeGen::set_rings);
@@ -40,8 +36,6 @@ void TreeGen::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius_scale", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_radius_scale", "get_radius_scale");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius_mult", PROPERTY_HINT_RANGE, "-2.0,2.0,0.01"), "set_radius_mult", "get_radius_mult");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_radius", "get_radius");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_RANGE, "0.0,100.0,0.01"), "set_height", "get_height");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "width", PROPERTY_HINT_RANGE, "0.0,100.0,0.01"), "set_width", "get_width");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radial_segments", PROPERTY_HINT_RANGE, "3.0,20.0,1.0"), "set_radial_segments", "get_radial_segments");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rings", PROPERTY_HINT_RANGE, "0.0,10.0,0.01"), "set_rings", "get_rings");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "leafScale", PROPERTY_HINT_RANGE, "0.0,20.0,0.01"), "set_leafScale", "get_leafScale");
