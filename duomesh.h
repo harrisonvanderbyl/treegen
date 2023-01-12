@@ -38,7 +38,7 @@ public:
 	virtual int surface_get_array_index_len(int p_idx) const;
 	virtual Array surface_get_arrays(int p_surface) const;
 	virtual TypedArray<Array> surface_get_blend_shape_arrays(int p_surface) const;
-	virtual uint32_t surface_get_format(int p_idx) const;
+	virtual BitField<Mesh::ArrayFormat> surface_get_format(int p_idx) const;
 	virtual Mesh::PrimitiveType surface_get_primitive_type(int p_idx) const;
 	virtual void surface_set_material(int p_idx, const Ref<Material> &p_material);
 	virtual Ref<Material> surface_get_material(int p_idx) const;

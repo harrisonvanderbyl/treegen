@@ -136,7 +136,7 @@ TypedArray<Array> DuoMesh::surface_get_blend_shape_arrays(int p_surface) const {
 	return Array();
 }
 
-uint32_t DuoMesh::surface_get_format(int p_idx) const {
+BitField<Mesh::ArrayFormat> DuoMesh::surface_get_format(int p_idx) const {
 	ERR_FAIL_INDEX_V(p_idx, 1, 0);
 	if (pending_request) {
 		_update();
