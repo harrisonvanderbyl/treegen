@@ -1,4 +1,7 @@
 # SCsub
 Import('env')
+envtreegen = env.Clone()
 
-env.add_source_files(env.modules_sources, "*.cpp")
+envtreegen.add_source_files(env.modules_sources, "*.cpp")
+
+# envtreegen.Append(CCFLAGS=['-Werror=suggest-override','-Wsuggest-override'])

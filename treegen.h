@@ -29,7 +29,7 @@ private:
 
 protected:
 	static void _bind_methods();
-	void _create_mesh_array(Array &p_arr, Dictionary tr) const;
+	void _create_mesh_array(Array &p_arr, Dictionary tr) const override;
 
 public:
 	void set_sections(const int p_sections);
@@ -71,7 +71,7 @@ public:
 	void updateParts();
 	Dictionary gen(float w, float h, Transform3D home) const;
 	Dictionary addtreebranch(Dictionary inf) const;
-	Dictionary createTree() const;
+	Dictionary createTree() const override;
 
 	TreeGen(){};
 };

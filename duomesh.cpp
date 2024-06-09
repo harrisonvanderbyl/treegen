@@ -235,7 +235,7 @@ Ref<Material> DuoMesh::get_material() const {
 	return material;
 }
 
-Array DuoMesh::get_mesh_arrays() const {
+Array DuoMesh::get_mesh_arrays() {
 	return surface_get_arrays(0);
 }
 
