@@ -47,7 +47,7 @@ public:
 	void set_blend_shape_name(int p_index, const StringName &p_name) override;
 	AABB get_aabb() const override;
 	RID get_rid() const override;
-	Dictionary surface_get_lods(int p_surface) {
+	Dictionary surface_get_lods(int p_surface) override {
 		return Dictionary(); //not really supported
 	}
 	virtual Dictionary createTree() const = 0;
