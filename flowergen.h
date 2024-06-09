@@ -20,7 +20,7 @@ private:
 
 protected:
 	static void _bind_methods();
-	virtual void _create_mesh_array(Array &p_arr) const;
+	void _create_mesh_array(Array &p_arr) const;
 
 public:
 	void create_flower(Array &p_arr, Array transforms) const;
