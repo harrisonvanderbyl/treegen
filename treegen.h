@@ -3,7 +3,7 @@
 
 #include "duomesh.h"
 #include <scene/3d/mesh_instance_3d.h>
-#include <scene/resources/primitive_meshes.h>
+#include <scene/resources/3d/primitive_meshes.h>
 // Generator based on a script, like GDScript, C# or NativeScript.
 // The script is expected to properly handle multithreading.
 class TreeGen : public DuoMesh {

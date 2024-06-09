@@ -2,7 +2,7 @@
 #define FLOWER_GEN_H
 
 #include <scene/3d/mesh_instance_3d.h>
-#include <scene/resources/primitive_meshes.h>
+#include <scene/resources/3d/primitive_meshes.h>
 // Generator that creates a lower from inputed parameters
 class FlowerGen : public PrimitiveMesh {
 	GDCLASS(FlowerGen, PrimitiveMesh)

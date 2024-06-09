@@ -36,7 +36,7 @@ void FlowerGen::_bind_methods() {
 
 void FlowerGen::set_petals(const int p_petals) {
 	petals = p_petals;
-	_request_update();
+	request_update();
 }
 
 int FlowerGen::get_petals() const {
@@ -45,7 +45,7 @@ int FlowerGen::get_petals() const {
 
 void FlowerGen::set_petal_width(const float p_petal_width) {
 	petal_width = p_petal_width;
-	_request_update();
+	request_update();
 }
 
 float FlowerGen::get_petal_width() const {
@@ -54,7 +54,7 @@ float FlowerGen::get_petal_width() const {
 
 void FlowerGen::set_petal_height(const float p_petal_height) {
 	petal_height = p_petal_height;
-	_request_update();
+	request_update();
 }
 
 float FlowerGen::get_petal_height() const {
@@ -63,7 +63,7 @@ float FlowerGen::get_petal_height() const {
 
 void FlowerGen::set_petal_curveLeft(const Ref<Curve> &p_petal_curveLeft) {
 	petal_curveLeft = p_petal_curveLeft;
-	_request_update();
+	request_update();
 }
 
 Ref<Curve> FlowerGen::get_petal_curveLeft() const {
@@ -72,7 +72,7 @@ Ref<Curve> FlowerGen::get_petal_curveLeft() const {
 
 void FlowerGen::set_petal_curveTop(const Ref<Curve> &p_petal_curveTop) {
 	petal_curveTop = p_petal_curveTop;
-	_request_update();
+	request_update();
 }
 
 Ref<Curve> FlowerGen::get_petal_curveTop() const {
@@ -85,12 +85,12 @@ Vector2 FlowerGen::get_petal_angle() const {
 
 void FlowerGen::set_petal_angle(const Vector2 p_petal_angle) {
 	petal_angle = p_petal_angle;
-	_request_update();
+	request_update();
 }
 
 void FlowerGen::set_petal_rings(const int p_petal_rings) {
 	petal_rings = p_petal_rings;
-	_request_update();
+	request_update();
 }
 
 int FlowerGen::get_petal_rings() const {
@@ -99,7 +99,7 @@ int FlowerGen::get_petal_rings() const {
 
 void FlowerGen::set_petal_scale(const float p_petal_scale) {
 	petal_scale = p_petal_scale;
-	_request_update();
+	request_update();
 }
 
 float FlowerGen::get_petal_scale() const {
@@ -108,7 +108,7 @@ float FlowerGen::get_petal_scale() const {
 
 void FlowerGen::set_petal_segments(const Vector2 p_petal_segments) {
 	petal_segments = Vector2(MAX(p_petal_segments.x, 2.0), MAX(p_petal_segments.y, 2.0));
-	_request_update();
+	request_update();
 }
 
 Vector2 FlowerGen::get_petal_segments() const {

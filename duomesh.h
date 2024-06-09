@@ -3,7 +3,7 @@
 
 #include "flowergen.h"
 #include "scene/resources/mesh.h"
-#include "scene/resources/primitive_meshes.h"
+#include "scene/resources/3d/primitive_meshes.h"
 
 #include "servers/rendering_server.h"
 class DuoMesh : public Mesh {
