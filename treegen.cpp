@@ -28,14 +28,14 @@ void TreeGen::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_leafScale", "leafScale"), &TreeGen::set_leafScale);
 	ClassDB::bind_method(D_METHOD("get_leafScale"), &TreeGen::get_leafScale);
 	ClassDB::bind_method(D_METHOD("get_transforms"), &TreeGen::get_transforms);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sections", PROPERTY_HINT_RANGE, "2.0,50.0,0.01"), "set_sections", "get_sections");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "sections", PROPERTY_HINT_RANGE, "2.0,10.0,1.0"), "set_sections", "get_sections");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "distribution", PROPERTY_HINT_RANGE, "0.0,2.0,0.01"), "set_distribution", "get_distribution");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "auto_split", PROPERTY_HINT_RANGE, "0.0,2.0,0.01"), "set_auto_split", "get_auto_split");
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR3_ARRAY, "splits", PROPERTY_HINT_NONE, ""), "set_splits", "get_splits");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rotation", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_rotation", "get_rotation");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius_scale", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_radius_scale", "get_radius_scale");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius_mult", PROPERTY_HINT_RANGE, "-2.0,2.0,0.01"), "set_radius_mult", "get_radius_mult");
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_radius", "get_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius_decay", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_radius_scale", "get_radius_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "length_decay", PROPERTY_HINT_RANGE, "0.01,2.0,0.01"), "set_radius_mult", "get_radius_mult");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.01,1.0,0.01"), "set_radius", "get_radius");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radial_segments", PROPERTY_HINT_RANGE, "3.0,20.0,1.0"), "set_radial_segments", "get_radial_segments");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rings", PROPERTY_HINT_RANGE, "0.0,10.0,0.01"), "set_rings", "get_rings");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "leafScale", PROPERTY_HINT_RANGE, "0.0,20.0,0.01"), "set_leafScale", "get_leafScale");
@@ -200,7 +200,7 @@ Dictionary TreeGen::addtreebranch(Dictionary inf) const {
 			Dictionary b = Array(Dictionary(inf["b"])["branches"])[bi];
 			Dictionary a = gen(b["w"], b["h"], b["tran"]);
 			//Transform zz = a["myTransform"];
-			if (float(b["w"]) > 0.5) {
+			if (float(b["w"]) > 0.1) {
 				Dictionary n = Dictionary{};
 				a["parent"] = tree * Transform3D(sidL[bi]);
 				n["b"] = a;

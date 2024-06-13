@@ -18,12 +18,12 @@ private:
 	float rotation = 0;
 	float radius_scale = 1.0;
 	float radius_mult = 0.5;
-	float radius = 1.0;
+	float radius = 0.1;
 	float height = 2.0;
 	float width = 3.0;
 	int radial_segments = 10;
 	int rings = 3;
-	float leafScale = 2.0;
+	float leafScale = 1.0;
 
 	Array transforms;
 
