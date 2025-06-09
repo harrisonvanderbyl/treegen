@@ -3,6 +3,11 @@
 
 #include <scene/3d/mesh_instance_3d.h>
 #include <scene/resources/3d/primitive_meshes.h>
+
+#define GETSET(c,t,p) void set_##p(c t p); t get_##p() c;
+#define GETSETINP(C,c,t,p, u) t C::get_##p() c {return p;}; void C::set_##p(c t p_##p) {p = p_##p; u();};
+
+
 // Generator that creates a lower from inputed parameters
 class FlowerGen : public PrimitiveMesh {
 	GDCLASS(FlowerGen, PrimitiveMesh)
@@ -10,8 +15,8 @@ private:
 	int petals = 5;
 	float petal_width = 0.5;
 	float petal_height = 0.5;
-	Ref<Curve> petal_curveLeft = Ref<Curve>();
-	Ref<Curve> petal_curveTop = Ref<Curve>();
+	Ref<Curve> petal_curveLeft;
+	Ref<Curve> petal_curveTop;
 
 	Vector2 petal_angle = Vector2(0, 0);
 	int petal_rings = 1;
@@ -24,26 +29,20 @@ protected:
 
 public:
 	void create_flower(Array &p_arr, Array transforms) const;
-	void set_petals(const int p_petals);
-	int get_petals() const;
-	void set_petal_width(const float p_petal_width);
-	float get_petal_width() const;
-	void set_petal_height(const float p_petal_height);
-	float get_petal_height() const;
-	void set_petal_curveLeft(const Ref<Curve> &p_petal_curveLeft);
-	Ref<Curve> get_petal_curveLeft() const;
-	void set_petal_curveTop(const Ref<Curve> &p_petal_curveTop);
-	Ref<Curve> get_petal_curveTop() const;
-	void set_petal_angle(const Vector2 p_petal_angle);
-	Vector2 get_petal_angle() const;
-	void set_petal_rings(const int p_petal_rings);
-	int get_petal_rings() const;
-	void set_petal_scale(const float p_petal_scale);
-	float get_petal_scale() const;
-	void set_petal_segments(const Vector2 p_petal_segments);
-	Vector2 get_petal_segments() const;
+
+	GETSET(const, int, petals)
+	GETSET(const, float, petal_width)
+	GETSET(const, float, petal_height)
+	GETSET(const, Ref<Curve>, petal_curveLeft)
+	GETSET(const, Ref<Curve>, petal_curveTop)
+	GETSET(const, Vector2, petal_angle)
+	GETSET(const, int, petal_rings)
+	GETSET(const, float, petal_scale)
+	GETSET(const, Vector2, petal_segments)
 
 	FlowerGen() {
+		petal_curveLeft = Ref<Curve>();
+		petal_curveTop = Ref<Curve>();
 		petal_curveLeft.instantiate();
 		petal_curveTop.instantiate();
 		petal_curveTop->add_point(Vector2(0, 0));

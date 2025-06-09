@@ -5,18 +5,25 @@
 void FlowerGen::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_petals", "petals"), &FlowerGen::set_petals);
 	ClassDB::bind_method(D_METHOD("get_petals"), &FlowerGen::get_petals);
+	
 	ClassDB::bind_method(D_METHOD("set_petal_width", "petal_width"), &FlowerGen::set_petal_width);
 	ClassDB::bind_method(D_METHOD("get_petal_width"), &FlowerGen::get_petal_width);
+
 	ClassDB::bind_method(D_METHOD("set_petal_height", "petal_height"), &FlowerGen::set_petal_height);
 	ClassDB::bind_method(D_METHOD("get_petal_height"), &FlowerGen::get_petal_height);
+
 	ClassDB::bind_method(D_METHOD("set_petal_curve_left", "petal_curve_left"), &FlowerGen::set_petal_curveLeft);
 	ClassDB::bind_method(D_METHOD("get_petal_curve_left"), &FlowerGen::get_petal_curveLeft);
+
 	ClassDB::bind_method(D_METHOD("set_petal_curve_top", "petal_curve_top"), &FlowerGen::set_petal_curveTop);
 	ClassDB::bind_method(D_METHOD("get_petal_curve_top"), &FlowerGen::get_petal_curveTop);
+
 	ClassDB::bind_method(D_METHOD("set_petal_angle", "petal_angle"), &FlowerGen::set_petal_angle);
 	ClassDB::bind_method(D_METHOD("get_petal_angle"), &FlowerGen::get_petal_angle);
+
 	ClassDB::bind_method(D_METHOD("set_petal_rings", "petal_rings"), &FlowerGen::set_petal_rings);
 	ClassDB::bind_method(D_METHOD("get_petal_rings"), &FlowerGen::get_petal_rings);
+
 	ClassDB::bind_method(D_METHOD("set_petal_scale", "petal_scale"), &FlowerGen::set_petal_scale);
 	ClassDB::bind_method(D_METHOD("get_petal_scale"), &FlowerGen::get_petal_scale);
 
@@ -31,89 +38,19 @@ void FlowerGen::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "petal_angle", PROPERTY_HINT_NONE, ""), "set_petal_angle", "get_petal_angle");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "petal_rings", PROPERTY_HINT_RANGE, "1,100,1"), "set_petal_rings", "get_petal_rings");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "petal_scale", PROPERTY_HINT_RANGE, "0.01,10,0.01"), "set_petal_scale", "get_petal_scale");
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "petal_segments", PROPERTY_HINT_RANGE, "1,100,1"), "set_petal_segments", "get_petal_segments");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "petal_segments", PROPERTY_HINT_RANGE, "2,100,1"), "set_petal_segments", "get_petal_segments");
 }
 
-void FlowerGen::set_petals(const int p_petals) {
-	petals = p_petals;
-	request_update();
-}
+GETSETINP(FlowerGen, const, int, petals, request_update)
+GETSETINP(FlowerGen, const, float, petal_width, request_update)
+GETSETINP(FlowerGen, const, float, petal_height, request_update)
+GETSETINP(FlowerGen, const, Ref<Curve>, petal_curveLeft, request_update)
+GETSETINP(FlowerGen, const, Ref<Curve>, petal_curveTop, request_update)
+GETSETINP(FlowerGen, const, Vector2, petal_angle, request_update)
+GETSETINP(FlowerGen, const, int, petal_rings, request_update)
+GETSETINP(FlowerGen, const, float, petal_scale, request_update)
+GETSETINP(FlowerGen, const, Vector2, petal_segments, request_update)
 
-int FlowerGen::get_petals() const {
-	return petals;
-}
-
-void FlowerGen::set_petal_width(const float p_petal_width) {
-	petal_width = p_petal_width;
-	request_update();
-}
-
-float FlowerGen::get_petal_width() const {
-	return petal_width;
-}
-
-void FlowerGen::set_petal_height(const float p_petal_height) {
-	petal_height = p_petal_height;
-	request_update();
-}
-
-float FlowerGen::get_petal_height() const {
-	return petal_height;
-}
-
-void FlowerGen::set_petal_curveLeft(const Ref<Curve> &p_petal_curveLeft) {
-	petal_curveLeft = p_petal_curveLeft;
-	request_update();
-}
-
-Ref<Curve> FlowerGen::get_petal_curveLeft() const {
-	return petal_curveLeft;
-}
-
-void FlowerGen::set_petal_curveTop(const Ref<Curve> &p_petal_curveTop) {
-	petal_curveTop = p_petal_curveTop;
-	request_update();
-}
-
-Ref<Curve> FlowerGen::get_petal_curveTop() const {
-	return petal_curveTop;
-}
-
-Vector2 FlowerGen::get_petal_angle() const {
-	return petal_angle;
-}
-
-void FlowerGen::set_petal_angle(const Vector2 p_petal_angle) {
-	petal_angle = p_petal_angle;
-	request_update();
-}
-
-void FlowerGen::set_petal_rings(const int p_petal_rings) {
-	petal_rings = p_petal_rings;
-	request_update();
-}
-
-int FlowerGen::get_petal_rings() const {
-	return petal_rings;
-}
-
-void FlowerGen::set_petal_scale(const float p_petal_scale) {
-	petal_scale = p_petal_scale;
-	request_update();
-}
-
-float FlowerGen::get_petal_scale() const {
-	return petal_scale;
-}
-
-void FlowerGen::set_petal_segments(const Vector2 p_petal_segments) {
-	petal_segments = Vector2(MAX(p_petal_segments.x, 2.0), MAX(p_petal_segments.y, 2.0));
-	request_update();
-}
-
-Vector2 FlowerGen::get_petal_segments() const {
-	return petal_segments;
-}
 
 Transform3D IDENTITY1 = Transform3D(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector3(0, 0, 0));
 
@@ -161,10 +98,7 @@ void FlowerGen::create_flower(Array &p_array, Array transforms) const {
 					float heightbb = petal_curveTop->sample((offset.x + ppetal * 1.01));
 					Vector3 scalews = Vector3(1.0, 1.0, widtha);
 					Vector3 scalewb = Vector3(1.0, 1.0, widthb);
-					//     points.push_back(petalTransform.xform(scalews*(Vector3(0, pow(k,petal_curve.y), 0)*scales + offset)));
-					// points.push_back(petalTransform.xform(scalews*(Vector3(0, pow(k,petal_curve.y), 1)*scales + offset)));
-					// points.push_back(petalTransform.xform(scalewb*(Vector3(1, pow(k+ppetal,petal_curve.y), 1)*scales + offset)));
-					// points.push_back(petalTransform.xform(scalewb*(Vector3(1, pow(k+ppetal,petal_curve.y), 0)*scales + offset)));
+					
 					Vector3 p1 = petalTransform.xform(scalews * (Vector3(0, heighta, 0) * scales + offset));
 					Vector3 p2 = petalTransform.xform(scalews * (Vector3(0, heighta, 1) * scales + offset));
 					Vector3 p3 = petalTransform.xform(scalewb * (Vector3(1, heightb, 1) * scales + offset));
