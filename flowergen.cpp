@@ -132,9 +132,9 @@ void FlowerGen::create_flower(Array &p_array, Array transforms) const {
 	int point_index = 0;
 	for (int leaft = 0; leaft < transforms.size(); leaft++) {
 		for (int i = 0; i < petals; i++) {
-			//float angle = i / (float)petals * 2.0 * Math_PI;
+			//float angle = i / (float)petals * 2.0 * 3.1415;
 			//add the golden raion to the angle
-			float ring_angle = ((float)i / float(petals)) * (Math_PI * (2.0 + 1.68 * float(petal_rings - 1)));
+			float ring_angle = ((float)i / float(petals)) * (3.1415 * (2.0 + 1.68 * float(petal_rings - 1)));
 			float scale = 1.0 / (1.0 + petal_scale * float(i) / float(petals)); //(1.0 + (float)j + (petal_scale) * (float)i / float(petals)) / (float)petal_rings;
 			float petalangle = Math::lerp_angle(petal_angle.x, petal_angle.y, float(i) / float(petals));
 			Transform3D petalTransform = IDENTITY1;

@@ -301,8 +301,8 @@ void TreeGen::_create_mesh_array(Array &p_arr, Dictionary tr) const {
 				u = i;
 				u /= radial_segments;
 
-				x = sin(u * (Math_PI * 2.0));
-				z = cos(u * (Math_PI * 2.0));
+				x = sin(u * (3.1415 * 2.0));
+				z = cos(u * (3.1415 * 2.0));
 
 				Vector3 pointa = Vector3(x * currradius, y, z * currradius);
 				Transform3D cur = t.interpolate_with(par, v);
