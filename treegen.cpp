@@ -189,6 +189,7 @@ Dictionary TreeGen::gen(float w, float h, Transform3D home) const {
 	thisbranch["leaftransform"] = home.translated_local(Vector3(0.0, h / 2, 0.0)) * IDENTITY.scaled(Vector3(leafScale, leafScale, leafScale));
 	return thisbranch;
 }
+
 Dictionary TreeGen::addtreebranch(Dictionary inf) const {
 	Array leaftransforms = Array{};
 	Array treetransforms = Array{};
@@ -240,6 +241,9 @@ Dictionary TreeGen::addtreebranch(Dictionary inf) const {
 	return ret;
 }
 Dictionary TreeGen::createTree() const {
+
+	
+
 	Dictionary b = gen(width, height, Transform3D(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector3(0, 0, 0)));
 	Dictionary z = Dictionary{};
 	b["parent"] = Transform3D(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector3(0, -0.5, 0)).scaled(Vector3(width, height, width));
@@ -306,8 +310,8 @@ void TreeGen::_create_mesh_array(Array &p_arr, Dictionary tr) const {
 
 				Vector3 pointa = Vector3(x * currradius, y, z * currradius);
 				Transform3D cur = t.interpolate_with(par, v);
-				Vector3 p = ((cur)*Transform3D(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1), pointa)).origin;
-				Vector3 c = ((cur)*Transform3D(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1), Vector3(0, y, 0))).origin;
+				Vector3 p = ((cur)*Transform3D(Basis(), pointa)).origin;
+				Vector3 c = ((cur)*Transform3D(Basis(), Vector3(0, y, 0))).origin;
 				Vector3 nn = (p - (c)).normalized();
 				Vector3 tangent = cur.basis[1].normalized().cross(nn).normalized();
 				points.push_back(p);
@@ -331,122 +335,10 @@ void TreeGen::_create_mesh_array(Array &p_arr, Dictionary tr) const {
 			thisrow = point;
 		};
 
-		/* add top
-		if (top_radius > 0.0) {
-			y = 1.0 * 0.5;
-
-			thisrow = point;
-			points.push_back(((t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(0.0, y, 0.0)))).origin);
-
-			normals.push_back(dir);
-			ADD_TANGENT(1.0, 0.0, 0.0, 1.0)
-			uvs.push_back(Vector2(0.5,1.0)*Vector2(0.25, 0.75));
-			point++;
-
-			for (i = 0; i <= radial_segments; i++) {
-				float r = i;
-				r /= radial_segments;
-
-				x = sin(r * (Math_PI * 2.0));
-				z = cos(r * (Math_PI * 2.0));
-
-				u = ((x + 1.0) * 0.25);
-				v = 0.5 + ((z + 1.0) * 0.25);
-
-				Vector3 p = (t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(x * top_radius, y, z * top_radius))).origin;
-				points.push_back(p);
-				ADD_TANGENT(1.0, 0.0, 0.0, 1.0)
-				uvs.push_back(Vector2(0.5,1.0)*Vector2(u, v));
-				point++;
-
-				if (i > 0) {
-					indices.push_back(thisrow);
-					indices.push_back(point - 1);
-					indices.push_back(point - 2);
-				};
-				normals.push_back(dir);
-			};
-		};
-
-		// add bottom
-		if (bottom_radius > 0.0) {
-			y = 1.0 * -0.5;
-
-			thisrow = point;
-			points.push_back((t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(0.0, y, 0.0))).origin);
-			normals.push_back(-dir);
-			ADD_TANGENT(1.0, 0.0, 0.0, 1.0)
-			uvs.push_back(Vector2(0.5,1.0)*Vector2(0.75, 0.75));
-			point++;
-
-			for (i = 0; i <= radial_segments; i++) {
-				float r = i;
-				r /= radial_segments;
-
-				x = sin(r * (Math_PI * 2.0));
-				z = cos(r * (Math_PI * 2.0));
-
-				u = 0.5 + ((x + 1.0) * 0.25);
-				v = 1.0 - ((z + 1.0) * 0.25);
-
-				Vector3 p = (t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(x * bottom_radius, y, z * bottom_radius))) .origin;
-				points.push_back(p);
-
-				ADD_TANGENT(1.0, 0.0, 0.0, 1.0)
-				uvs.push_back(Vector2(0.5,1.0)*Vector2(u, v));
-				point++;
-
-				if (i > 0) {
-					indices.push_back(thisrow);
-					indices.push_back(point - 2);
-					indices.push_back(point - 1);
-				};
-				normals.push_back(-dir);
-			};
-		};*/
+		
 		thisrow = point;
 	}
-	// for(int lr = 0; lr < leaf.size(); lr++){
-	// 	Transform t = leaf[lr];
-	// 	Vector3 a = (t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(0.0, 1.0, 0.5)*leafScale)).origin;
-	// 	Vector3 b = (t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(0.0, 1.0, -0.5)*leafScale)).origin;
-	// 	Vector3 c = (t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(0.0, 0.0, 0.5)*leafScale)).origin;
-	// 	Vector3 d = (t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(0.0, 0.0, -0.5)*leafScale)).origin;
-	// 	Vector3 n = (t*Transform(Basis(1, 0, 0, 0, 1, 0, 0, 0, 1 ),Vector3(-1.0, 0.0, 0.0))).origin - t.origin;
-	// 	points.push_back(a);
-	// 	points.push_back(b);
-	// 	points.push_back(c);
-	// 	points.push_back(c);
-	// 	points.push_back(b);
-	// 	points.push_back(d);
-	// 	normals.push_back(-n);
-	// 	normals.push_back(-n);
-	// 	normals.push_back(-n);
-	// 	normals.push_back(-n);
-	// 	normals.push_back(-n);
-	// 	normals.push_back(-n);
-	// 	ADD_TANGENT(1.0, 0.0, 0.0, 1.0);
-	// 	ADD_TANGENT(1.0, 0.0, 0.0, 1.0);
-	// 	ADD_TANGENT(1.0, 0.0, 0.0, 1.0);
-	// 	ADD_TANGENT(1.0, 0.0, 0.0, 1.0);
-	// 	ADD_TANGENT(1.0, 0.0, 0.0, 1.0);
-	// 	ADD_TANGENT(1.0, 0.0, 0.0, 1.0);
-	// 	uvs.push_back(split+Vector2(0.5,1.0)*Vector2(0.0, 0.0));
-	// 	uvs.push_back(split+Vector2(0.5,1.0)*Vector2(1.0, 0.0));
-	// 	uvs.push_back(split+Vector2(0.5,1.0)*Vector2(0.0, 1.0));
-	// 	uvs.push_back(split+Vector2(0.5,1.0)*Vector2(0.0, 1.0));
-	// 	uvs.push_back(split+Vector2(0.5,1.0)*Vector2(1.0, 0.0));
-	// 	uvs.push_back(split+Vector2(0.5,1.0)*Vector2(1.0, 1.0));
-
-	// 	indices.push_back(point);
-	// 	indices.push_back(point+1);
-	// 	indices.push_back(point+2);
-	// 	indices.push_back(point+3);
-	// 	indices.push_back(point+4);
-	// 	indices.push_back(point+5);
-	// 	point += 6;
-	// 	thisrow = point;
-	//}
+	
 	p_arr[ARRAY_VERTEX] = points;
 	p_arr[ARRAY_NORMAL] = normals;
 	p_arr[ARRAY_TANGENT] = tangents;

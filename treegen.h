@@ -13,6 +13,7 @@ private:
 	float distribution = 0.5;
 	float auto_split = 0.5;
 	PackedVector3Array splits = PackedVector3Array();
+	
 	Array sid = Array();
 	Array sidL = Array();
 	float rotation = 0;

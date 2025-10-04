@@ -6,6 +6,7 @@
 
 #define GETSET(c,t,p) void set_##p(c t p); t get_##p() c;
 #define GETSETINP(C,c,t,p, u) t C::get_##p() c {return p;}; void C::set_##p(c t p_##p) {p = p_##p; u();};
+#define GETSETINPH(C,c,t,p, u) t get_##p() c {return p;}; void set_##p(c t p_##p) {p = p_##p; u();};
 
 
 // Generator that creates a lower from inputed parameters
