@@ -3,8 +3,9 @@
 *.obj
 
 # SCons build output
-bin/
+/bin/
 project/bin/*/
+!project/bin/treegen.gdextension
 
 # Generated bindings / doc data
 src/gen/
