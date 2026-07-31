@@ -73,15 +73,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: treegen-${{ matrix.artifact-name }}
-          path: |
-            project/bin/treegen.gdextension
-            project/bin/${{ matrix.platform }}/
+          path: project/bin/${{ matrix.platform }}/
 
   bundle:
     name: Bundle GDExtension
     needs: build
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -90,10 +90,15 @@ jobs:
 
       - name: Assemble addon folder
         run: |
+          echo "=== Full contents of artifacts/ ==="
+          find artifacts -type f | sort
+          echo ""
+          echo "=== Contents of project/bin/ from checkout ==="
+          find project/bin -type f | sort
+          echo ""
           mkdir -p addon/treegen
-          # Copy the .gdextension file from any artifact (they're identical)
-          first_artifact=$(ls artifacts | head -1)
-          cp "artifacts/$first_artifact/treegen.gdextension" addon/treegen/
+          # Copy the .gdextension file from the repo (static, not built)
+          cp project/bin/treegen.gdextension addon/treegen/
           # Map each artifact to its platform folder and merge
           for dir in artifacts/*/; do
             name=$(basename "$dir")
@@ -111,6 +116,8 @@ jobs:
             fi
           done
           # Show the final structure
+          echo ""
+          echo "=== Final addon/ structure ==="
           find addon -type f | sort
 
       - name: Upload bundled addon
