@@ -75,7 +75,7 @@ jobs:
           name: treegen-${{ matrix.artifact-name }}
           path: |
             project/bin/treegen.gdextension
-            project/bin/${{ matrix.artifact-name }}/
+            project/bin/${{ matrix.platform }}/
 
   bundle:
     name: Bundle GDExtension
@@ -103,9 +103,11 @@ jobs:
               treegen-macos)      platform="macos" ;;
               *)                  platform="" ;;
             esac
-            if [ -n "$platform" ] && [ -d "$dir/$platform" ]; then
+            if [ -n "$platform" ]; then
               mkdir -p "addon/treegen/$platform"
-              cp -r "$dir/$platform/." "addon/treegen/$platform/"
+              # Copy whatever .so/.dll/.dylib files exist in this artifact
+              find "$dir" -type f \( -name '*.so' -o -name '*.dll' -o -name '*.dylib' \) \
+                -exec cp {} "addon/treegen/$platform/" \;
             fi
           done
           # Show the final structure
