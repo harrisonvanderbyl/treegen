@@ -1,0 +1,148 @@
+name: Build GDExtension
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+            platform: linux
+            target: template_release
+            artifact-name: linux-x86_64
+          - name: linux-arm64
+            os: ubuntu-22.04-arm
+            platform: linux
+            target: template_release
+            artifact-name: linux-arm64
+            extra-args: arch=arm64
+          - name: windows-x86_64
+            os: windows-2022
+            platform: windows
+            target: template_release
+            artifact-name: windows-x86_64
+          - name: windows-arm64
+            os: windows-11-arm
+            platform: windows
+            target: template_release
+            artifact-name: windows-arm64
+            extra-args: arch=arm64
+          - name: macos-universal
+            os: macos-14
+            platform: macos
+            target: template_release
+            artifact-name: macos
+            extra-args: arch=universal
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install SCons
+        run: |
+          python -m pip install --upgrade pip
+          pip install scons
+
+      - name: Add godot-cpp submodule
+        run: |
+          git submodule add https://github.com/godotengine/godot-cpp godot-cpp || true
+          cd godot-cpp
+          git checkout 4.5
+          git submodule update --init --recursive
+
+      - name: Build
+        run: scons platform=${{ matrix.platform }} target=${{ matrix.target }} ${{ matrix.extra-args }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: treegen-${{ matrix.artifact-name }}
+          path: |
+            project/bin/treegen.gdextension
+            project/bin/${{ matrix.artifact-name }}/
+
+  bundle:
+    name: Bundle GDExtension
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: Assemble addon folder
+        run: |
+          mkdir -p addon/treegen
+          # Copy the .gdextension file from any artifact (they're identical)
+          first_artifact=$(ls artifacts | head -1)
+          cp "artifacts/$first_artifact/project/bin/treegen.gdextension" addon/treegen/
+          # Map each artifact to its platform folder and merge
+          for dir in artifacts/*/; do
+            name=$(basename "$dir")
+            case "$name" in
+              treegen-linux-*)    platform="linux" ;;
+              treegen-windows-*)  platform="windows" ;;
+              treegen-macos)      platform="macos" ;;
+              *)                  platform="" ;;
+            esac
+            if [ -n "$platform" ] && [ -d "$dir/project/bin/$platform" ]; then
+              mkdir -p "addon/treegen/$platform"
+              cp -r "$dir/project/bin/$platform/." "addon/treegen/$platform/"
+            fi
+          done
+          # Show the final structure
+          find addon -type f | sort
+
+      - name: Upload bundled addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: treegen-addon
+          path: addon/
+
+  release:
+    name: Create release
+    needs: bundle
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    permissions:
+      contents: write
+    steps:
+      - name: Download bundled addon
+        uses: actions/download-artifact@v4
+        with:
+          name: treegen-addon
+          path: treegen
+
+      - name: Zip addon
+        run: zip -r treegen-addon.zip treegen/
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: Latest Build
+          body: |
+            Auto-built GDExtension from commit ${{ github.sha }}.
+
+            Download `treegen-addon.zip`, unzip it into your Godot project folder,
+            and enable the extension in Project Settings → Extensions.
+          files: treegen-addon.zip
+          prerelease: true
