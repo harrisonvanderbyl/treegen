@@ -93,7 +93,7 @@ jobs:
           mkdir -p addon/treegen
           # Copy the .gdextension file from any artifact (they're identical)
           first_artifact=$(ls artifacts | head -1)
-          cp "artifacts/$first_artifact/project/bin/treegen.gdextension" addon/treegen/
+          cp "artifacts/$first_artifact/treegen.gdextension" addon/treegen/
           # Map each artifact to its platform folder and merge
           for dir in artifacts/*/; do
             name=$(basename "$dir")
@@ -103,9 +103,9 @@ jobs:
               treegen-macos)      platform="macos" ;;
               *)                  platform="" ;;
             esac
-            if [ -n "$platform" ] && [ -d "$dir/project/bin/$platform" ]; then
+            if [ -n "$platform" ] && [ -d "$dir/$platform" ]; then
               mkdir -p "addon/treegen/$platform"
-              cp -r "$dir/project/bin/$platform/." "addon/treegen/$platform/"
+              cp -r "$dir/$platform/." "addon/treegen/$platform/"
             fi
           done
           # Show the final structure
