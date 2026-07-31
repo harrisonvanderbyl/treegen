@@ -18,29 +18,24 @@ jobs:
           - name: linux-x86_64
             os: ubuntu-22.04
             platform: linux
-            target: template_release
             artifact-name: linux-x86_64
           - name: linux-arm64
             os: ubuntu-22.04-arm
             platform: linux
-            target: template_release
             artifact-name: linux-arm64
             extra-args: arch=arm64
           - name: windows-x86_64
             os: windows-2022
             platform: windows
-            target: template_release
             artifact-name: windows-x86_64
           - name: windows-arm64
             os: windows-11-arm
             platform: windows
-            target: template_release
             artifact-name: windows-arm64
             extra-args: arch=arm64
           - name: macos-universal
             os: macos-14
             platform: macos
-            target: template_release
             artifact-name: macos
             extra-args: arch=universal
 
@@ -67,7 +62,9 @@ jobs:
           git submodule update --init --recursive
 
       - name: Build
-        run: scons platform=${{ matrix.platform }} target=${{ matrix.target }} ${{ matrix.extra-args }}
+        run: |
+          scons platform=${{ matrix.platform }} target=template_debug ${{ matrix.extra-args }}
+          scons platform=${{ matrix.platform }} target=template_release ${{ matrix.extra-args }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
