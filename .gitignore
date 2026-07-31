@@ -1,1 +1,17 @@
+# Compilation artifacts
 *.o
+*.obj
+
+# SCons build output
+bin/
+project/bin/*/
+
+# Generated bindings / doc data
+src/gen/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# godot-cpp submodule
+godot-cpp/
