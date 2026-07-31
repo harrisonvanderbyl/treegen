@@ -2,6 +2,8 @@
 
 A GDExtension for Godot 4 that procedurally generates tree and flower meshes.
 
+![treegen preview](image.png)
+
 ## Classes
 
 - **`TreeGenerator`** — A `Mesh` resource that builds a branching tree. The
