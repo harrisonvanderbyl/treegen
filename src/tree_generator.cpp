@@ -9,9 +9,15 @@
 
 namespace godot {
 
+// Reusable identity transform, used as a base for building scaled/rotated transforms.
 static const Transform3D IDENTITY = Transform3D();
 
+// Shorthand for PI; the codebase uses 3.1415 throughout for historical reasons.
+static constexpr float PI = 3.1415f;
+static constexpr float TAU = 2.0f * PI;
+
 void TreeGenerator::_bind_methods() {
+	// --- Bind getters/setters ---
 	ClassDB::bind_method(D_METHOD("set_branch_depth", "branch_depth"), &TreeGenerator::set_branch_depth);
 	ClassDB::bind_method(D_METHOD("get_branch_depth"), &TreeGenerator::get_branch_depth);
 	ClassDB::bind_method(D_METHOD("set_distribution", "distribution"), &TreeGenerator::set_distribution);
@@ -43,7 +49,7 @@ void TreeGenerator::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_tree_branch", "inf"), &TreeGenerator::add_tree_branch);
 	ClassDB::bind_method(D_METHOD("create_tree"), &TreeGenerator::create_tree);
 
-	// Branching parameters.
+	// --- Branching parameters ---
 	ADD_GROUP("Branches", "branch_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "branch_depth", PROPERTY_HINT_RANGE, "1,10,1"), "set_branch_depth", "get_branch_depth");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "branch_distribution", PROPERTY_HINT_RANGE, "0.0,2.0,0.01"), "set_distribution", "get_distribution");
@@ -53,18 +59,22 @@ void TreeGenerator::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "branch_radius_decay", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_radius_decay", "get_radius_decay");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "branch_length_decay", PROPERTY_HINT_RANGE, "0.01,2.0,0.01"), "set_length_decay", "get_length_decay");
 
-	// Trunk parameters.
+	// --- Trunk parameters ---
 	ADD_GROUP("Trunk", "trunk_");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "trunk_radius", PROPERTY_HINT_RANGE, "0.01,1.0,0.01"), "set_radius", "get_radius");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "trunk_height", PROPERTY_HINT_RANGE, "0.01,10.0,0.01"), "set_height", "get_height");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "trunk_width", PROPERTY_HINT_RANGE, "0.01,10.0,0.01"), "set_width", "get_width");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "trunk_leaf_scale", PROPERTY_HINT_RANGE, "0.0,20.0,0.01"), "set_leaf_scale", "get_leaf_scale");
 
-	// Mesh parameters.
+	// --- Mesh parameters ---
 	ADD_GROUP("Mesh", "mesh_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "mesh_radial_segments", PROPERTY_HINT_RANGE, "3,20,1"), "set_radial_segments", "get_radial_segments");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "mesh_rings", PROPERTY_HINT_RANGE, "0,10,1"), "set_rings", "get_rings");
 }
+
+// ============================================================================
+// Getters / setters
+// ============================================================================
 
 void TreeGenerator::set_branch_depth(int p_branch_depth) {
 	branch_depth = p_branch_depth;
@@ -86,18 +96,24 @@ float TreeGenerator::get_distribution() const {
 
 void TreeGenerator::set_auto_split(float p_auto_split) {
 	auto_split = p_auto_split;
-	PackedVector3Array temp;
+
+	// Ensure there are at least two split entries so the trunk always forks.
 	if (splits.size() < 2) {
 		splits.clear();
 		splits.push_back(Vector3(0, 0, 0));
 		splits.push_back(Vector3(0, 0, 0));
 	}
+
+	// Rebuild the split angle (x component) for every split based on the new
+	// auto_split value. The position along the trunk is bent by `distribution`.
+	PackedVector3Array rebuilt;
 	for (int i = 0; i < splits.size(); i++) {
-		float tp = float(i) / float(splits.size());
-		float atp = ((tp - 0.5) * float(distribution)) + 0.5;
-		temp.append(Vector3(atp * auto_split, 0, 0));
+		float position_along_trunk = float(i) / float(splits.size());
+		float bent_position = ((position_along_trunk - 0.5f) * distribution) + 0.5f;
+		rebuilt.append(Vector3(bent_position * auto_split, 0, 0));
 	}
-	splits = temp;
+	splits = rebuilt;
+
 	update_parts();
 	_request_update();
 }
@@ -107,17 +123,21 @@ float TreeGenerator::get_auto_split() const {
 }
 
 void TreeGenerator::set_splits(PackedVector3Array p_splits) {
-	PackedVector3Array temp = PackedVector3Array();
+	// Normalize the split weights (y component) so their squared sum is 1.
+	// This keeps the relative influence of each split stable regardless of
+	// the raw values the user enters.
+	float total_weight_sq = 0.0;
+	for (int i = 0; i < p_splits.size(); i++) {
+		total_weight_sq += p_splits[i].y * p_splits[i].y;
+	}
+	float total_weight = MAX(sqrt(total_weight_sq), 0.0001);
 
-	float tot = 0.0;
+	PackedVector3Array normalized;
 	for (int i = 0; i < p_splits.size(); i++) {
-		tot += p_splits[i].y * p_splits[i].y;
+		normalized.append(Vector3(p_splits[i].x, p_splits[i].y / total_weight, p_splits[i].z));
 	}
-	tot = MAX(sqrt(tot), 0.0001);
-	for (int i = 0; i < p_splits.size(); i++) {
-		temp.append(Vector3(p_splits[i].x, p_splits[i].y / tot, p_splits[i].z));
-	}
-	splits = temp;
+	splits = normalized;
+
 	update_parts();
 	_request_update();
 }
@@ -210,107 +230,153 @@ float TreeGenerator::get_leaf_scale() const {
 }
 
 Array TreeGenerator::get_transforms() {
-	if (!transforms.is_empty())
+	if (!transforms.is_empty()) {
 		return transforms;
-	else {
-		Dictionary tr = create_tree();
-		Array tree = tr["tree"];
-		Array leaf = tr["leaf"];
-		transforms = tree;
-		return tree;
 	}
+	// Lazily build the tree and cache the branch transforms.
+	Dictionary tree_data = create_tree();
+	transforms = tree_data["tree"];
+	return transforms;
 }
 
+// Builds a single branch descriptor at the top of `home` with width `w` and
+// height `h`. The descriptor contains:
+//   - "branches": child branch descriptors (one per split)
+//   - "myTransform": the transform of this branch's own cylinder
+//   - "leaftransform": transform used to place leaves/flowers at this branch
 Dictionary TreeGenerator::gen(float w, float h, Transform3D home) const {
-	Dictionary thisbranch = Dictionary{};
-	Transform3D az = home.translated_local((Vector3(0.0, h, 0.0)));
-	thisbranch["branches"] = Array{};
-	for (int i = 0; i < splits.size(); i++) {
-		Dictionary z = Dictionary{};
-		float tp = float(i) / float(splits.size());
-		float atp = ((tp - 0.5) * float(distribution)) + 0.5;
-		z["tran"] = (az * Transform3D(sid[i]));
-		z["w"] = sqrt((w * w) * float(radius_decay) * (1.0 - atp));
-		z["h"] = sqrt(h * h * (1.0 - atp) * float(length_decay));
-		Array(thisbranch["branches"]).append(z);
-	}
-	Transform3D t = home.translated_local(Vector3(0.0, h / 2, 0.0)) * IDENTITY.scaled(Vector3(w, h, w));
-	thisbranch["myTransform"] = t;
+	Dictionary branch;
+	// Move to the top of the parent branch; children emanate from here.
+	Transform3D branch_origin = home.translated_local(Vector3(0.0, h, 0.0));
 
-	thisbranch["leaftransform"] = home.translated_local(Vector3(0.0, h / 2, 0.0)) * IDENTITY.scaled(Vector3(leaf_scale, leaf_scale, leaf_scale));
-	return thisbranch;
+	branch["branches"] = Array{};
+	for (int i = 0; i < splits.size(); i++) {
+		Dictionary child;
+		float position_along_trunk = float(i) / float(splits.size());
+		float bent_position = ((position_along_trunk - 0.5f) * distribution) + 0.5f;
+
+		child["tran"] = (branch_origin * Transform3D(branch_orientations[i]));
+		child["w"] = sqrt((w * w) * radius_decay * (1.0f - bent_position));
+		child["h"] = sqrt(h * h * (1.0f - bent_position) * length_decay);
+		Array(branch["branches"]).append(child);
+	}
+
+	// This branch's own cylinder: centered at half height, scaled to (w, h, w).
+	branch["myTransform"] = home.translated_local(Vector3(0.0, h / 2.0, 0.0)) * IDENTITY.scaled(Vector3(w, h, w));
+
+	// Leaf/flower transform: centered at half height, scaled by leaf_scale.
+	branch["leaftransform"] = home.translated_local(Vector3(0.0, h / 2.0, 0.0)) * IDENTITY.scaled(Vector3(leaf_scale, leaf_scale, leaf_scale));
+
+	return branch;
 }
 
+// Recursively expands a branch descriptor into flat arrays of tree transforms,
+// leaf transforms, and parent transforms. `inf` is a Dictionary with keys:
+//   - "b": the branch descriptor (from gen())
+//   - "d": remaining recursion depth
+//   - "parent": the parent alignment transform
 Dictionary TreeGenerator::add_tree_branch(Dictionary inf) const {
-	Array leaftransforms = Array{};
-	Array treetransforms = Array{};
-	Array parentTransforms = Array{};
-	Transform3D tree = Dictionary(inf["b"])["myTransform"];
-	Transform3D leaf = Dictionary(inf["b"])["leaftransform"];
-	if (int(inf["d"]) > 0) {
-		for (int bi = 0; bi < Array(Dictionary(inf["b"])["branches"]).size(); bi++) {
-			Dictionary b = Array(Dictionary(inf["b"])["branches"])[bi];
-			Dictionary a = gen(b["w"], b["h"], b["tran"]);
-			if (float(b["w"]) > 0.1) {
-				Dictionary n = Dictionary{};
-				a["parent"] = tree * Transform3D(sid_left[bi]);
-				n["b"] = a;
-				n["d"] = int(inf["d"]) - 1;
+	Array leaf_transforms;
+	Array tree_transforms;
+	Array parent_transforms;
 
-				Dictionary r = add_tree_branch(n);
-				Array nt = r["tree"];
-				Array nl = r["leaf"];
-				Array npt = r["parent"];
-				for (int yy = 0; yy < nt.size(); yy++) {
-					treetransforms.append(nt[yy]);
-					parentTransforms.append(npt[yy]);
+	Transform3D branch_transform = Dictionary(inf["b"])["myTransform"];
+	Transform3D leaf_transform = Dictionary(inf["b"])["leaftransform"];
+	int remaining_depth = int(inf["d"]);
+
+	if (remaining_depth > 0) {
+		Array children = Dictionary(inf["b"])["branches"];
+		for (int child_index = 0; child_index < children.size(); child_index++) {
+			Dictionary child = children[child_index];
+			Dictionary child_branch = gen(child["w"], child["h"], child["tran"]);
+
+			// Only recurse into branches that are thick enough to be visible.
+			if (float(child["w"]) > 0.1f) {
+				Dictionary recursion_input;
+				child_branch["parent"] = branch_transform * Transform3D(parent_alignments[child_index]);
+				recursion_input["b"] = child_branch;
+				recursion_input["d"] = remaining_depth - 1;
+
+				Dictionary recursion_result = add_tree_branch(recursion_input);
+				Array child_trees = recursion_result["tree"];
+				Array child_leaves = recursion_result["leaf"];
+				Array child_parents = recursion_result["parent"];
+
+				for (int i = 0; i < child_trees.size(); i++) {
+					tree_transforms.append(child_trees[i]);
+					parent_transforms.append(child_parents[i]);
 				}
-				for (int xx = 0; xx < nl.size(); xx++) {
-					leaftransforms.append(nl[xx]);
+				for (int i = 0; i < child_leaves.size(); i++) {
+					leaf_transforms.append(child_leaves[i]);
 				}
 			} else {
-				if (bi == 0) {
-					leaftransforms.append(leaf);
+				// Thin branches terminate with a leaf at the first child only,
+				// avoiding duplicate leaves when multiple splits collapse.
+				if (child_index == 0) {
+					leaf_transforms.append(leaf_transform);
 				}
 			}
 		}
 	} else {
-		leaftransforms.append(leaf);
+		// At depth 0, this branch ends in a leaf.
+		leaf_transforms.append(leaf_transform);
 	}
 
-	treetransforms.append(tree);
-	Transform3D parent = Dictionary(inf["b"])["parent"];
-	parentTransforms.append(parent);
-	Dictionary ret = Dictionary{};
-	ret["tree"] = treetransforms;
-	ret["leaf"] = leaftransforms;
-	ret["parent"] = parentTransforms;
-	return ret;
+	// Append this branch's own transform last (post-order).
+	tree_transforms.append(branch_transform);
+	parent_transforms.append(Dictionary(inf["b"])["parent"]);
+
+	Dictionary result;
+	result["tree"] = tree_transforms;
+	result["leaf"] = leaf_transforms;
+	result["parent"] = parent_transforms;
+	return result;
 }
 
 Dictionary TreeGenerator::create_tree() const {
-	Dictionary b = gen(width, height, Transform3D());
-	Dictionary z = Dictionary{};
-	b["parent"] = Transform3D().scaled(Vector3(width, height, width)).translated(Vector3(0, -0.5, 0));
-	z["b"] = b;
-	z["d"] = branch_depth;
+	// Generate the root branch from the trunk parameters.
+	Dictionary root_branch = gen(width, height, Transform3D());
 
-	Dictionary t = add_tree_branch(z);
-	return t;
+	// The root's "parent" is a dummy transform used for the base of the trunk.
+	root_branch["parent"] = Transform3D().scaled(Vector3(width, height, width)).translated(Vector3(0, -0.5, 0));
+
+	Dictionary input;
+	input["b"] = root_branch;
+	input["d"] = branch_depth;
+
+	return add_tree_branch(input);
 }
 
+// Rebuilds the per-split orientation and parent-alignment transforms from the
+// current splits, rotation, and radial_segments. Called whenever any of those
+// parameters change.
 void TreeGenerator::update_parts() {
-	sid = Array();
-	sid_left = Array();
+	branch_orientations = Array();
+	parent_alignments = Array();
+
 	for (int i = 0; i < splits.size(); i++) {
-		float tp = float(i) / float(splits.size());
-		sid.append(
-				IDENTITY.rotated(Vector3(0.0, 0.0, 1.0), (float(splits[i].x) * 3.1415 / 2)).rotated(Vector3(0.0, 1.0, 0.0), 2.0 * ((tp + rotation) * 3.1415)));
-		sid_left.append(
-				IDENTITY.rotated(Vector3(0, 1, 0), (2.0 * (round((float(i) / float(splits.size()) + rotation) * float(radial_segments)) / float(radial_segments)) * 3.1415)));
+		float position_along_trunk = float(i) / float(splits.size());
+
+		// Each child branch is tilted by its split angle (x) around Z, then
+		// rotated around Y to distribute children around the trunk.
+		float tilt_angle = float(splits[i].x) * PI / 2.0f;
+		float yaw_angle = TAU * (position_along_trunk + rotation);
+		branch_orientations.append(
+				IDENTITY.rotated(Vector3(0.0, 0.0, 1.0), tilt_angle)
+						.rotated(Vector3(0.0, 1.0, 0.0), yaw_angle));
+
+		// The parent alignment snaps each child to the nearest radial segment
+		// so the top of the parent cylinder meets the child cleanly.
+		float snapped_position = round((position_along_trunk + rotation) * float(radial_segments)) / float(radial_segments);
+		float align_angle = TAU * snapped_position;
+		parent_alignments.append(
+				IDENTITY.rotated(Vector3(0, 1, 0), align_angle));
 	}
 }
 
+// Builds the trunk/branch mesh geometry into `p_arr` from the tree data in
+// `p_tr`. Each entry in the "tree" array becomes a tapered cylinder segment
+// that interpolates from its own transform to its parent's top.
 void TreeGenerator::_create_mesh_array(Array &p_arr, const Dictionary &p_tr) const {
 #define ADD_TANGENT(m_x, m_y, m_z, m_d) \
 	tangents.push_back(m_x);            \
@@ -320,11 +386,10 @@ void TreeGenerator::_create_mesh_array(Array &p_arr, const Dictionary &p_tr) con
 
 	p_arr[Mesh::ARRAY_VERTEX] = Array();
 	p_arr[Mesh::ARRAY_NORMAL] = Array();
+
 	Array tree = p_tr["tree"];
 	Array leaf = p_tr["leaf"];
 	Array parent = p_tr["parent"];
-	int i, j, prevrow, thisrow, point;
-	float x, y, z, u, v, currradius;
 
 	PackedVector3Array points;
 	PackedVector3Array normals;
@@ -332,42 +397,51 @@ void TreeGenerator::_create_mesh_array(Array &p_arr, const Dictionary &p_tr) con
 	PackedVector2Array uvs;
 	PackedInt32Array indices;
 
-	point = 0;
-	// Generate a Cylinder for the trunk for each transform in the tree array
-	thisrow = 0;
-	prevrow = 0;
+	int point = 0;
+	int thisrow = 0;
+	int prevrow = 0;
+
+	// Generate a cylinder for each branch transform in the tree array.
 	for (int cr = 0; cr < tree.size(); cr++) {
-		Transform3D t = tree[cr];
-		Transform3D n = parent[cr];
-		Transform3D par = n * IDENTITY.translated_local(Vector3(0.0, 0.5, 0.0));
+		Transform3D branch_transform = tree[cr];
+		Transform3D parent_transform = parent[cr];
+		// The parent's top is at y=0.5 in its local space.
+		Transform3D parent_top = parent_transform * IDENTITY.translated_local(Vector3(0.0, 0.5, 0.0));
 
-		for (j = 0; j <= (rings + 1); j++) {
-			v = j;
-			v /= (rings + 1);
+		for (int j = 0; j <= (rings + 1); j++) {
+			float v = float(j) / float(rings + 1);
 
-			currradius = radius;
-			y = 1.0 * v;
-			y = (0.1) - y * 0.5;
+			// The cylinder spans y in [-0.4, 0.1] locally; v=0 is the bottom.
+			float y = 0.1f - v * 0.5f;
 
-			for (i = 0; i <= radial_segments; i++) {
-				u = i;
-				u /= radial_segments;
+			for (int i = 0; i <= radial_segments; i++) {
+				float u = float(i) / float(radial_segments);
 
-				x = sin(u * (3.1415 * 2.0));
-				z = cos(u * (3.1415 * 2.0));
+				float x = sin(u * TAU);
+				float z = cos(u * TAU);
 
-				Vector3 pointa = Vector3(x * currradius, y, z * currradius);
-				Transform3D cur = t.interpolate_with(par, v);
-				Vector3 p = ((cur)*Transform3D(Basis(), pointa)).origin;
-				Vector3 c = ((cur)*Transform3D(Basis(), Vector3(0, y, 0))).origin;
-				Vector3 nn = (p - (c)).normalized();
-				Vector3 tangent = cur.basis[1].normalized().cross(nn).normalized();
+				// Point on the cylinder surface at radius `radius`.
+				Vector3 surface_point = Vector3(x * radius, y, z * radius);
+
+				// Interpolate between this branch and its parent's top so the
+				// segment tapers and connects smoothly.
+				Transform3D cur = branch_transform.interpolate_with(parent_top, v);
+				Vector3 p = (cur * Transform3D(Basis(), surface_point)).origin;
+
+				// Normal points outward from the cylinder's central axis.
+				Vector3 center = (cur * Transform3D(Basis(), Vector3(0, y, 0))).origin;
+				Vector3 normal = (p - center).normalized();
+
+				// Tangent is perpendicular to the normal and the branch axis.
+				Vector3 tangent = cur.basis[1].normalized().cross(normal).normalized();
+
 				points.push_back(p);
-				normals.push_back(nn);
+				normals.push_back(normal);
 				ADD_TANGENT(tangent.x, tangent.y, tangent.z, 1.0)
 				uvs.push_back(Vector2(u, v));
 				point++;
 
+				// Emit two triangles per quad (once we have a full grid cell).
 				if (i > 0 && j > 0) {
 					indices.push_back(prevrow + i - 1);
 					indices.push_back(prevrow + i);
@@ -376,15 +450,16 @@ void TreeGenerator::_create_mesh_array(Array &p_arr, const Dictionary &p_tr) con
 					indices.push_back(prevrow + i);
 					indices.push_back(thisrow + i);
 					indices.push_back(thisrow + i - 1);
-				};
-			};
+				}
+			}
 
 			prevrow = thisrow;
 			thisrow = point;
-		};
+		}
 
 		thisrow = point;
 	}
+
 	p_arr[Mesh::ARRAY_VERTEX] = points;
 	p_arr[Mesh::ARRAY_NORMAL] = normals;
 	p_arr[Mesh::ARRAY_TANGENT] = tangents;

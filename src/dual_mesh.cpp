@@ -11,6 +11,7 @@ DualMesh::DualMesh() {
 	mesh = RenderingServer::get_singleton()->mesh_create();
 	primitive_type = Mesh::PRIMITIVE_TRIANGLES;
 	pending_request = true;
+	// Default leaf transform: a single transform rotated so leaves face up.
 	leaf_transforms = Array();
 	leaf_transforms.push_back(Transform3D(Basis(0, 0, 1, 0, 1, 0, 1, 0, 0), Vector3(0, 0, 0)));
 }
@@ -19,79 +20,84 @@ DualMesh::~DualMesh() {
 	RenderingServer::get_singleton()->free_rid(mesh);
 }
 
+// Rebuilds both mesh surfaces (primary + optional secondary) from scratch.
+// Called lazily whenever a consumer reads mesh data while pending_request is set.
 void DualMesh::_update() const {
-	Dictionary tr = create_tree();
-	Array arr;
-	arr.resize(Mesh::ARRAY_MAX);
-	_create_mesh_array(arr, tr);
+	Dictionary tree_data = create_tree();
 
-	PackedVector3Array points = arr[Mesh::ARRAY_VERTEX];
+	// --- Primary surface (trunk/branches) ---
+	Array primary_arrays;
+	primary_arrays.resize(Mesh::ARRAY_MAX);
+	_create_mesh_array(primary_arrays, tree_data);
 
+	PackedVector3Array points = primary_arrays[Mesh::ARRAY_VERTEX];
+
+	// Recompute the AABB from the primary surface vertices.
 	aabb = AABB();
-
-	int pc = points.size();
-	ERR_FAIL_COND(pc == 0);
+	int point_count = points.size();
+	ERR_FAIL_COND(point_count == 0);
 	{
-		const Vector3 *r = points.ptr();
-		for (int i = 0; i < pc; i++) {
+		const Vector3 *read_ptr = points.ptr();
+		for (int i = 0; i < point_count; i++) {
 			if (i == 0) {
-				aabb.position = r[i];
+				aabb.position = read_ptr[i];
 			} else {
-				aabb.expand_to(r[i]);
+				aabb.expand_to(read_ptr[i]);
 			}
 		}
 	}
 
-	PackedInt32Array indices = arr[Mesh::ARRAY_INDEX];
+	PackedInt32Array indices = primary_arrays[Mesh::ARRAY_INDEX];
 
+	// Optionally flip faces: negate normals and wind triangles backwards.
 	if (flip_faces) {
-		PackedVector3Array normals = arr[Mesh::ARRAY_NORMAL];
+		PackedVector3Array normals = primary_arrays[Mesh::ARRAY_NORMAL];
 
 		if (normals.size() && indices.size()) {
 			{
-				int nc = normals.size();
-				Vector3 *w = normals.ptrw();
-				for (int i = 0; i < nc; i++) {
-					w[i] = -w[i];
+				int normal_count = normals.size();
+				Vector3 *write_ptr = normals.ptrw();
+				for (int i = 0; i < normal_count; i++) {
+					write_ptr[i] = -write_ptr[i];
 				}
 			}
-
 			{
-				int ic = indices.size();
-				int32_t *w = indices.ptrw();
-				for (int i = 0; i < ic; i += 3) {
-					SWAP(w[i + 0], w[i + 1]);
+				int index_count = indices.size();
+				int32_t *write_ptr = indices.ptrw();
+				for (int i = 0; i < index_count; i += 3) {
+					SWAP(write_ptr[i + 0], write_ptr[i + 1]);
 				}
 			}
-			arr[Mesh::ARRAY_NORMAL] = normals;
-			arr[Mesh::ARRAY_INDEX] = indices;
+			primary_arrays[Mesh::ARRAY_NORMAL] = normals;
+			primary_arrays[Mesh::ARRAY_INDEX] = indices;
 		}
 	}
 
-	array_len = pc;
+	array_len = point_count;
 	index_array_len = indices.size();
-	// in with the new
+
+	// Upload the primary surface to the RenderingServer.
 	RenderingServer::get_singleton()->mesh_clear(mesh);
-	RenderingServer::get_singleton()->mesh_add_surface_from_arrays(mesh, (RenderingServer::PrimitiveType)primitive_type, arr);
+	RenderingServer::get_singleton()->mesh_add_surface_from_arrays(mesh, (RenderingServer::PrimitiveType)primitive_type, primary_arrays);
 	RenderingServer::get_singleton()->mesh_surface_set_material(mesh, 0, material.is_null() ? RID() : material->get_rid());
 
-	Array arr2;
-	arr2.resize(Mesh::ARRAY_MAX);
+	// --- Secondary surface (flowers/leaves), if a FlowerGenerator is assigned ---
+	Array secondary_arrays;
+	secondary_arrays.resize(Mesh::ARRAY_MAX);
 	if (mesh_a.is_valid()) {
-		Array tree = tr["tree"];
-		Array leaf = tr["leaf"];
-		mesh_a->create_flower(arr2, leaf);
+		Array tree = tree_data["tree"];
+		Array leaf = tree_data["leaf"];
+		mesh_a->create_flower(secondary_arrays, leaf);
 
-		PackedVector3Array pointsa = arr2[Mesh::ARRAY_VERTEX];
+		PackedVector3Array secondary_points = secondary_arrays[Mesh::ARRAY_VERTEX];
+		array_len_a = secondary_points.size();
+		index_array_len_a = Array(secondary_arrays[Mesh::ARRAY_INDEX]).size();
 
-		array_len_a = pointsa.size();
-		index_array_len_a = Array(arr2[Mesh::ARRAY_INDEX]).size();
-		// in with the new
-		RenderingServer::get_singleton()->mesh_add_surface_from_arrays(mesh, (RenderingServer::PrimitiveType)primitive_type, arr2);
+		RenderingServer::get_singleton()->mesh_add_surface_from_arrays(mesh, (RenderingServer::PrimitiveType)primitive_type, secondary_arrays);
 		RenderingServer::get_singleton()->mesh_surface_set_material(mesh, 1, mesh_a->get_material().is_null() ? RID() : mesh_a->get_material()->get_rid());
 	}
-	pending_request = false;
 
+	pending_request = false;
 	const_cast<DualMesh *>(this)->emit_changed();
 }
 
@@ -101,6 +107,14 @@ void DualMesh::_request_update() {
 	}
 	_update();
 }
+
+// ============================================================================
+// Surface queries
+//
+// The mesh exposes up to two surfaces:
+//   index 0 = primary (trunk/branches)
+//   index 1 = secondary (flowers/leaves), only when mesh_a is set
+// ============================================================================
 
 int32_t DualMesh::_get_surface_count() const {
 	if (pending_request) {
@@ -114,10 +128,10 @@ int32_t DualMesh::_surface_get_array_len(int32_t p_index) const {
 	if (pending_request) {
 		_update();
 	}
-	if (p_index == 0)
+	if (p_index == 0) {
 		return array_len;
-	else
-		return array_len_a;
+	}
+	return array_len_a;
 }
 
 int32_t DualMesh::_surface_get_array_index_len(int32_t p_index) const {
@@ -125,10 +139,10 @@ int32_t DualMesh::_surface_get_array_index_len(int32_t p_index) const {
 	if (pending_request) {
 		_update();
 	}
-	if (p_index == 0)
+	if (p_index == 0) {
 		return index_array_len;
-	else
-		return index_array_len_a;
+	}
+	return index_array_len_a;
 }
 
 Array DualMesh::_surface_get_arrays(int32_t p_index) const {
@@ -136,7 +150,6 @@ Array DualMesh::_surface_get_arrays(int32_t p_index) const {
 	if (pending_request) {
 		_update();
 	}
-
 	return RenderingServer::get_singleton()->mesh_surface_get_arrays(mesh, 0);
 }
 
@@ -145,7 +158,6 @@ TypedArray<Array> DualMesh::_surface_get_blend_shape_arrays(int32_t p_index) con
 	if (pending_request) {
 		_update();
 	}
-
 	return Array();
 }
 
@@ -158,7 +170,6 @@ uint32_t DualMesh::_surface_get_format(int32_t p_index) const {
 	if (pending_request) {
 		_update();
 	}
-
 	return (uint32_t)(Mesh::ARRAY_FORMAT_VERTEX | Mesh::ARRAY_FORMAT_NORMAL | Mesh::ARRAY_FORMAT_TANGENT | Mesh::ARRAY_FORMAT_TEX_UV | Mesh::ARRAY_FORMAT_INDEX);
 }
 
@@ -178,13 +189,11 @@ Ref<FlowerGenerator> DualMesh::get_mesh_a() const {
 
 void DualMesh::_surface_set_material(int32_t p_index, const Ref<Material> &p_material) {
 	ERR_FAIL_INDEX(p_index, 1);
-
 	set_material(p_material);
 }
 
 Ref<Material> DualMesh::_surface_get_material(int32_t p_index) const {
 	ERR_FAIL_INDEX_V(p_index, 1, nullptr);
-
 	return material;
 }
 
@@ -203,7 +212,6 @@ AABB DualMesh::_get_aabb() const {
 	if (pending_request) {
 		_update();
 	}
-
 	return aabb;
 }
 
@@ -213,6 +221,10 @@ RID DualMesh::_get_rid() const {
 	}
 	return mesh;
 }
+
+// ============================================================================
+// Property bindings
+// ============================================================================
 
 void DualMesh::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_update"), &DualMesh::_update);
@@ -237,15 +249,18 @@ void DualMesh::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flip_faces"), "set_flip_faces", "get_flip_faces");
 }
 
+// ============================================================================
+// Material / AABB / flip_faces setters
+// ============================================================================
+
 void DualMesh::set_material(const Ref<Material> &p_material) {
 	material = p_material;
 	if (!pending_request) {
-		// just apply it, else it'll happen when _update is called.
+		// Apply immediately; otherwise it will be applied during _update.
 		RenderingServer::get_singleton()->mesh_surface_set_material(mesh, 0, material.is_null() ? RID() : material->get_rid());
-
 		notify_property_list_changed();
 		emit_changed();
-	};
+	}
 }
 
 Ref<Material> DualMesh::get_material() const {

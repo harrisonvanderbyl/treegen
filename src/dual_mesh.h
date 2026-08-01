@@ -20,18 +20,19 @@ class DualMesh : public Mesh {
 	GDCLASS(DualMesh, Mesh)
 
 private:
-	RID mesh;
-	mutable AABB aabb;
-	AABB custom_aabb;
-	Ref<FlowerGenerator> mesh_a;
-	Ref<Material> material;
-	bool flip_faces = false;
+	RID mesh; // RenderingServer RID for the underlying mesh resource.
+	mutable AABB aabb; // Computed bounding box, updated during _update().
+	AABB custom_aabb; // User-overridable AABB.
+	Ref<FlowerGenerator> mesh_a; // Optional secondary mesh (flowers/leaves).
+	Ref<Material> material; // Material for the primary surface.
+	bool flip_faces = false; // If true, normals are negated and winding reversed.
 
-	mutable int array_len = 0;
-	mutable int index_array_len = 0;
-	mutable int array_len_a = 0;
-	mutable int index_array_len_a = 0;
-	mutable bool pending_request = false;
+	// Cached surface metrics (primary = surface 0, secondary = surface 1).
+	mutable int array_len = 0; // Vertex count, primary surface.
+	mutable int index_array_len = 0; // Index count, primary surface.
+	mutable int array_len_a = 0; // Vertex count, secondary surface.
+	mutable int index_array_len_a = 0; // Index count, secondary surface.
+	mutable bool pending_request = false; // True when the mesh needs rebuilding.
 	void _update() const;
 
 protected:
@@ -39,10 +40,13 @@ protected:
 
 	static void _bind_methods();
 
+	// Subclasses fill `p_arr` with the primary surface geometry, using the
+	// tree data in `p_tr` (keys: "tree", "leaf", "parent").
 	virtual void _create_mesh_array(Array &p_arr, const Dictionary &p_tr) const = 0;
 	void _request_update();
 
 public:
+	// --- Mesh surface interface (overrides for Godot's Mesh API) ---
 	int32_t _get_surface_count() const override;
 	int32_t _surface_get_array_len(int32_t p_index) const override;
 	int32_t _surface_get_array_index_len(int32_t p_index) const override;
@@ -59,21 +63,26 @@ public:
 	AABB _get_aabb() const override;
 	RID _get_rid() const override;
 
+	// Subclasses build and return the full tree data dictionary.
 	virtual Dictionary create_tree() const = 0;
 
-	Array leaf_transforms;
+	Array leaf_transforms; // Transforms for placing leaves/flowers.
 
+	// --- Secondary mesh (flowers/leaves) ---
 	void set_mesh_a(const Ref<FlowerGenerator> &p_mesh);
 	Ref<FlowerGenerator> get_mesh_a() const;
 
+	// --- Material ---
 	void set_material(const Ref<Material> &p_material);
 	Ref<Material> get_material() const;
 
 	Array get_mesh_arrays();
 
+	// --- AABB ---
 	void set_custom_aabb(const AABB &p_custom);
 	AABB get_custom_aabb() const;
 
+	// --- Flip faces ---
 	void set_flip_faces(bool p_enable);
 	bool get_flip_faces() const;
 

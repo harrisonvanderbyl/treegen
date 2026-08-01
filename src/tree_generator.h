@@ -18,27 +18,27 @@ class TreeGenerator : public DualMesh {
 
 private:
 	// --- Branching parameters ---
-	int branch_depth = 3;
-	float distribution = 0.5;
-	float auto_split = 0.5;
-	PackedVector3Array splits = PackedVector3Array();
-	Array sid;
-	Array sid_left;
-	float rotation = 0;
-	float radius_decay = 1.0;
-	float length_decay = 0.5;
+	int branch_depth = 3; // Recursion depth: how many times the trunk splits.
+	float distribution = 0.5; // Bends split positions toward the trunk center.
+	float auto_split = 0.5; // Auto-generated split angle for each branch.
+	PackedVector3Array splits = PackedVector3Array(); // Per-split control vectors (x=angle, y=weight, z=unused).
+	Array branch_orientations; // Per-split orientation transform applied to each child branch.
+	Array parent_alignments; // Per-split transform aligning a parent's top to its child.
+	float rotation = 0; // Rotates the whole branch arrangement around the trunk.
+	float radius_decay = 1.0; // How quickly child branch radius shrinks.
+	float length_decay = 0.5; // How quickly child branch length shrinks.
 
 	// --- Trunk parameters ---
-	float radius = 0.1;
-	float height = 2.0;
-	float width = 3.0;
-	float leaf_scale = 1.0;
+	float radius = 0.1; // Base trunk radius.
+	float height = 2.0; // Base trunk height.
+	float width = 3.0; // Base trunk width.
+	float leaf_scale = 1.0; // Scale of the leaf/flower transforms.
 
 	// --- Mesh parameters ---
-	int radial_segments = 10;
-	int rings = 3;
+	int radial_segments = 10; // Cylinder segments around the branch circumference.
+	int rings = 3; // Rings along each branch segment for smoothness.
 
-	Array transforms;
+	Array transforms; // Cached tree branch transforms.
 
 protected:
 	static void _bind_methods();

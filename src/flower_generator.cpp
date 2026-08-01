@@ -9,7 +9,11 @@
 
 namespace godot {
 
+// Shorthand for PI; the codebase uses 3.1415 throughout for historical reasons.
+static constexpr float PI = 3.1415f;
+
 void FlowerGenerator::_bind_methods() {
+	// --- Bind getters/setters ---
 	ClassDB::bind_method(D_METHOD("set_petals", "petals"), &FlowerGenerator::set_petals);
 	ClassDB::bind_method(D_METHOD("get_petals"), &FlowerGenerator::get_petals);
 	ClassDB::bind_method(D_METHOD("set_petal_width", "petal_width"), &FlowerGenerator::set_petal_width);
@@ -42,6 +46,7 @@ void FlowerGenerator::_bind_methods() {
 }
 
 FlowerGenerator::FlowerGenerator() {
+	// Create default curves so the flower has a sensible shape out of the box.
 	petal_curve_left.instantiate();
 	petal_curve_top.instantiate();
 	petal_curve_top->add_point(Vector2(0, 0));
@@ -49,6 +54,10 @@ FlowerGenerator::FlowerGenerator() {
 	petal_curve_left->add_point(Vector2(1.0, 0.0));
 	petal_curve_left->add_point(Vector2(0.5, 0.5));
 }
+
+// ============================================================================
+// Getters / setters
+// ============================================================================
 
 void FlowerGenerator::set_petals(const int p_petals) {
 	petals = p_petals;
@@ -123,6 +132,7 @@ float FlowerGenerator::get_petal_scale() const {
 }
 
 void FlowerGenerator::set_petal_segments(const Vector2 p_petal_segments) {
+	// Clamp each axis to a minimum of 2 so every petal has at least one quad.
 	petal_segments = Vector2(MAX(p_petal_segments.x, 2.0), MAX(p_petal_segments.y, 2.0));
 	request_update();
 }
@@ -131,6 +141,9 @@ Vector2 FlowerGenerator::get_petal_segments() const {
 	return petal_segments;
 }
 
+// Builds flower geometry into `p_array`. For each leaf transform in
+// `p_transforms`, `petals` petals are generated. Each petal is a grid of
+// quads whose width and height are shaped by the left/top curves.
 void FlowerGenerator::create_flower(Array &p_array, const Array &p_transforms) const {
 #define ADD_TANGENT(m_x, m_y, m_z, m_d) \
 	tangents.push_back(m_x);            \
@@ -144,62 +157,86 @@ void FlowerGenerator::create_flower(Array &p_array, const Array &p_transforms) c
 	PackedVector2Array uvs;
 	PackedInt32Array indices;
 	int point_index = 0;
-	for (int leaft = 0; leaft < p_transforms.size(); leaft++) {
-		for (int i = 0; i < petals; i++) {
-			float ring_angle = ((float)i / float(petals)) * (3.1415 * (2.0 + 1.68 * float(petal_rings - 1)));
-			float scale = 1.0 / (1.0 + petal_scale * float(i) / float(petals));
-			float petalangle = Math::lerp_angle(petal_angle.x, petal_angle.y, float(i) / float(petals));
-			Transform3D petalTransform = Transform3D();
-			petalTransform.scale(Vector3(petal_height, petal_height, petal_width));
 
-			petalTransform.rotate(Vector3(0, 0, 1), petalangle);
-			petalTransform.rotate(Vector3(0, 1, 0), ring_angle);
-			petalTransform.scale(Vector3(scale, scale, scale));
-			petalTransform = (Transform3D() * Transform3D(p_transforms[leaft])) * petalTransform;
-			float ppetal = 1.0 / (float)petal_segments.x;
-			float ppetalw = 1.0 / (float)petal_segments.y;
-			Vector3 scales = Vector3(ppetal, 1.0, ppetalw);
-			for (float k = 0.0; k < 1.0; k += ppetal) {
-				for (float l = 0.0; l < 1.0; l += ppetalw) {
-					Vector2 offset2 = Vector2(k, l);
+	// Step sizes for the petal grid: how far each quad advances in u (length)
+	// and v (width).
+	float u_step = 1.0f / float(petal_segments.x);
+	float v_step = 1.0f / float(petal_segments.y);
+	Vector3 grid_scale = Vector3(u_step, 1.0f, v_step);
 
-					Vector3 offset = Vector3(offset2.x, 0, offset2.y - 0.5);
+	for (int leaf_index = 0; leaf_index < p_transforms.size(); leaf_index++) {
+		for (int petal_index = 0; petal_index < petals; petal_index++) {
+			float petal_fraction = float(petal_index) / float(petals);
 
-					float widtha = petal_curve_left->sample((float)k);
-					float heighta = petal_curve_top->sample(offset.x);
-					float heightab = petal_curve_top->sample(offset.x + ppetal * 0.01);
-					float widthb = petal_curve_left->sample(((float)k + ppetal));
-					float heightb = petal_curve_top->sample((offset.x + ppetal));
-					float heightbb = petal_curve_top->sample((offset.x + ppetal * 1.01));
-					Vector3 scalews = Vector3(1.0, 1.0, widtha);
-					Vector3 scalewb = Vector3(1.0, 1.0, widthb);
-					Vector3 p1 = petalTransform.xform(scalews * (Vector3(0, heighta, 0) * scales + offset));
-					Vector3 p2 = petalTransform.xform(scalews * (Vector3(0, heighta, 1) * scales + offset));
-					Vector3 p3 = petalTransform.xform(scalewb * (Vector3(1, heightb, 1) * scales + offset));
-					Vector3 p4 = petalTransform.xform(scalewb * (Vector3(1, heightb, 0) * scales + offset));
-					Vector3 p1b = petalTransform.xform(scalews * (Vector3(0.01, heightab, 0) * scales + offset));
-					Vector3 p4b = petalTransform.xform(scalewb * (Vector3(1.01, heightbb, 0) * scales + offset));
-					points.push_back(p1);
-					points.push_back(p2);
-					points.push_back(p3);
-					points.push_back(p4);
-					Vector3 normal = (p1 - p2).cross(p1 - p1b).normalized();
-					Vector3 normal2 = (p4 - p3).cross(p4 - p4b).normalized();
-					normals.push_back(normal);
-					normals.push_back(normal);
-					normals.push_back(normal2);
-					normals.push_back(normal2);
+			// Ring angle spreads petals around the flower; extra rings add
+			// overlap for a fuller look.
+			float ring_angle = petal_fraction * (PI * (2.0f + 1.68f * float(petal_rings - 1)));
+			// Each successive petal shrinks slightly based on petal_scale.
+			float petal_shrink = 1.0f / (1.0f + petal_scale * petal_fraction);
+			// Petal tilt interpolates between the two angle components.
+			float petal_tilt = Math::lerp_angle(petal_angle.x, petal_angle.y, petal_fraction);
+
+			// Build the petal's local transform: scale to petal dimensions,
+			// tilt, rotate around the ring, apply shrink, then place at leaf.
+			Transform3D petal_transform = Transform3D();
+			petal_transform.scale(Vector3(petal_height, petal_height, petal_width));
+			petal_transform.rotate(Vector3(0, 0, 1), petal_tilt);
+			petal_transform.rotate(Vector3(0, 1, 0), ring_angle);
+			petal_transform.scale(Vector3(petal_shrink, petal_shrink, petal_shrink));
+			petal_transform = (Transform3D() * Transform3D(p_transforms[leaf_index])) * petal_transform;
+
+			// Generate the petal as a grid of quads.
+			for (float u = 0.0f; u < 1.0f; u += u_step) {
+				for (float v = 0.0f; v < 1.0f; v += v_step) {
+					Vector2 uv_offset = Vector2(u, v);
+					Vector3 position = Vector3(uv_offset.x, 0, uv_offset.y - 0.5f);
+
+					// Sample the shaping curves at the quad's corners and just
+					// past them (for normal computation via finite difference).
+					float width_at_u = petal_curve_left->sample(u);
+					float width_at_u_next = petal_curve_left->sample(u + u_step);
+					float height_at_u = petal_curve_top->sample(position.x);
+					float height_at_u_next = petal_curve_top->sample(position.x + u_step);
+					float height_at_u_eps = petal_curve_top->sample(position.x + u_step * 0.01f);
+					float height_at_u_next_eps = petal_curve_top->sample(position.x + u_step * 1.01f);
+
+					Vector3 scale_width = Vector3(1.0, 1.0, width_at_u);
+					Vector3 scale_width_next = Vector3(1.0, 1.0, width_at_u_next);
+
+					// Four corners of the quad.
+					Vector3 corner_00 = petal_transform.xform(scale_width * (Vector3(0, height_at_u, 0) * grid_scale + position));
+					Vector3 corner_01 = petal_transform.xform(scale_width * (Vector3(0, height_at_u, 1) * grid_scale + position));
+					Vector3 corner_11 = petal_transform.xform(scale_width_next * (Vector3(1, height_at_u_next, 1) * grid_scale + position));
+					Vector3 corner_10 = petal_transform.xform(scale_width_next * (Vector3(1, height_at_u_next, 0) * grid_scale + position));
+
+					// Two points slightly ahead along u, for normal estimation.
+					Vector3 corner_00_ahead = petal_transform.xform(scale_width * (Vector3(0.01f, height_at_u_eps, 0) * grid_scale + position));
+					Vector3 corner_10_ahead = petal_transform.xform(scale_width_next * (Vector3(1.01f, height_at_u_next_eps, 0) * grid_scale + position));
+
+					points.push_back(corner_00);
+					points.push_back(corner_01);
+					points.push_back(corner_11);
+					points.push_back(corner_10);
+
+					// Normals via cross products using the ahead-points.
+					Vector3 normal_front = (corner_00 - corner_01).cross(corner_00 - corner_00_ahead).normalized();
+					Vector3 normal_back = (corner_10 - corner_11).cross(corner_10 - corner_10_ahead).normalized();
+					normals.push_back(normal_front);
+					normals.push_back(normal_front);
+					normals.push_back(normal_back);
+					normals.push_back(normal_back);
 
 					ADD_TANGENT(0, 0, 1, 0);
 					ADD_TANGENT(0, 0, 1, 0);
 					ADD_TANGENT(0, 0, 1, 0);
 					ADD_TANGENT(0, 0, 1, 0);
 
-					uvs.push_back(offset2);
-					uvs.push_back(offset2 + Vector2(0, ppetalw));
-					uvs.push_back(offset2 + Vector2(ppetal, ppetalw));
-					uvs.push_back(offset2 + Vector2(ppetal, 0));
+					uvs.push_back(uv_offset);
+					uvs.push_back(uv_offset + Vector2(0, v_step));
+					uvs.push_back(uv_offset + Vector2(u_step, v_step));
+					uvs.push_back(uv_offset + Vector2(u_step, 0));
 
+					// Two triangles per quad.
 					indices.push_back(point_index);
 					indices.push_back(point_index + 2);
 					indices.push_back(point_index + 1);
@@ -212,6 +249,7 @@ void FlowerGenerator::create_flower(Array &p_array, const Array &p_transforms) c
 			}
 		}
 	}
+
 	p_array[Mesh::ARRAY_VERTEX] = points;
 	p_array[Mesh::ARRAY_NORMAL] = normals;
 	p_array[Mesh::ARRAY_TANGENT] = tangents;
@@ -221,11 +259,12 @@ void FlowerGenerator::create_flower(Array &p_array, const Array &p_transforms) c
 }
 
 Array FlowerGenerator::_create_mesh_array() const {
-	Array arr = Array();
-	arr.push_back(Transform3D());
+	// PrimitiveMesh interface: generate a standalone flower at the origin.
+	Array leaf_transforms;
+	leaf_transforms.push_back(Transform3D());
 	Array p_array;
 	p_array.resize(Mesh::ARRAY_MAX);
-	create_flower(p_array, arr);
+	create_flower(p_array, leaf_transforms);
 	return p_array;
 }
 

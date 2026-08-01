@@ -12,16 +12,16 @@ class FlowerGenerator : public PrimitiveMesh {
 	GDCLASS(FlowerGenerator, PrimitiveMesh)
 
 private:
-	int petals = 5;
-	float petal_width = 0.5;
-	float petal_height = 0.5;
-	Ref<Curve> petal_curve_left;
-	Ref<Curve> petal_curve_top;
+	int petals = 5; // Number of petals per leaf transform.
+	float petal_width = 0.5; // Width of each petal.
+	float petal_height = 0.5; // Height of each petal.
+	Ref<Curve> petal_curve_left; // Curve shaping petal width along its length.
+	Ref<Curve> petal_curve_top; // Curve shaping petal height along its length.
 
-	Vector2 petal_angle = Vector2(0, 0);
-	int petal_rings = 1;
-	float petal_scale = 0.0;
-	Vector2 petal_segments = Vector2(3, 3);
+	Vector2 petal_angle = Vector2(0, 0); // Tilt angle range (x=start, y=end) across petals.
+	int petal_rings = 1; // Number of overlapping rings for a fuller flower.
+	float petal_scale = 0.0; // Per-petal shrink factor.
+	Vector2 petal_segments = Vector2(3, 3); // Grid resolution per petal (x=length, y=width).
 
 protected:
 	static void _bind_methods();
