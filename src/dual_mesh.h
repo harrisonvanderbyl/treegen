@@ -35,6 +35,10 @@ private:
 	mutable bool pending_request = false; // True when the mesh needs rebuilding.
 	void _update() const;
 
+	// Called when the assigned FlowerGenerator changes, so the tree's
+	// secondary surface is regenerated.
+	void _on_mesh_a_changed();
+
 protected:
 	Mesh::PrimitiveType primitive_type = Mesh::PRIMITIVE_TRIANGLES;
 

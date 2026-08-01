@@ -1,6 +1,7 @@
 #include "dual_mesh.h"
 
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 
@@ -17,6 +18,10 @@ DualMesh::DualMesh() {
 }
 
 DualMesh::~DualMesh() {
+	// Disconnect from the FlowerGenerator's changed signal before we go away.
+	if (mesh_a.is_valid() && mesh_a->is_connected("changed", callable_mp(this, &DualMesh::_on_mesh_a_changed))) {
+		mesh_a->disconnect("changed", callable_mp(this, &DualMesh::_on_mesh_a_changed));
+	}
 	RenderingServer::get_singleton()->free_rid(mesh);
 }
 
@@ -178,13 +183,31 @@ uint32_t DualMesh::_surface_get_primitive_type(int32_t p_index) const {
 }
 
 void DualMesh::set_mesh_a(const Ref<FlowerGenerator> &p_mesh) {
+	// Disconnect from the old FlowerGenerator's changed signal.
+	if (mesh_a.is_valid() && mesh_a->is_connected("changed", callable_mp(this, &DualMesh::_on_mesh_a_changed))) {
+		mesh_a->disconnect("changed", callable_mp(this, &DualMesh::_on_mesh_a_changed));
+	}
+
 	mesh_a = p_mesh;
+
+	// Connect to the new FlowerGenerator's changed signal so the tree
+	// regenerates its secondary surface whenever the flower mesh is updated.
+	if (mesh_a.is_valid()) {
+		mesh_a->connect("changed", callable_mp(this, &DualMesh::_on_mesh_a_changed));
+	}
+
 	pending_request = true;
 	_request_update();
 }
 
 Ref<FlowerGenerator> DualMesh::get_mesh_a() const {
 	return mesh_a;
+}
+
+void DualMesh::_on_mesh_a_changed() {
+	// The FlowerGenerator changed; rebuild the tree (including the secondary
+	// surface) so the new flower geometry is picked up.
+	_request_update();
 }
 
 void DualMesh::_surface_set_material(int32_t p_index, const Ref<Material> &p_material) {
