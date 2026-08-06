@@ -16,8 +16,35 @@ static const Transform3D IDENTITY = Transform3D();
 static constexpr float PI = 3.1415f;
 static constexpr float TAU = 2.0f * PI;
 
+// Integer hash (finalizer from MurmurHash3). Provides good avalanche so that
+// consecutive branch IDs produce uncorrelated random values.
+uint32_t TreeGenerator::_hash(uint32_t x) {
+	x ^= x >> 16u;
+	x *= 0x85ebca6bu;
+	x ^= x >> 13u;
+	x *= 0xc2b2ae35u;
+	x ^= x >> 16u;
+	return x;
+}
+
+// Returns a value in [-1, 1] by hashing the current seed together with `id`.
+float TreeGenerator::_rand(uint32_t id) const {
+	uint32_t h = _hash(uint32_t(seed) ^ id);
+	// Map [0, UINT32_MAX] → [-1, 1].
+	return (float(h) / float(UINT32_MAX)) * 2.0f - 1.0f;
+}
+
 void TreeGenerator::_bind_methods() {
-	// --- Bind getters/setters ---
+	ClassDB::bind_method(D_METHOD("set_seed", "seed"), &TreeGenerator::set_seed);
+	ClassDB::bind_method(D_METHOD("get_seed"), &TreeGenerator::get_seed);
+	ClassDB::bind_method(D_METHOD("set_randomness", "randomness"), &TreeGenerator::set_randomness);
+	ClassDB::bind_method(D_METHOD("get_randomness"), &TreeGenerator::get_randomness);
+	ClassDB::bind_method(D_METHOD("set_curvature", "curvature"), &TreeGenerator::set_curvature);
+	ClassDB::bind_method(D_METHOD("get_curvature"), &TreeGenerator::get_curvature);
+	ClassDB::bind_method(D_METHOD("set_gravity", "gravity"), &TreeGenerator::set_gravity);
+	ClassDB::bind_method(D_METHOD("get_gravity"), &TreeGenerator::get_gravity);
+	ClassDB::bind_method(D_METHOD("set_clump", "clump"), &TreeGenerator::set_clump);
+	ClassDB::bind_method(D_METHOD("get_clump"), &TreeGenerator::get_clump);
 	ClassDB::bind_method(D_METHOD("set_branch_depth", "branch_depth"), &TreeGenerator::set_branch_depth);
 	ClassDB::bind_method(D_METHOD("get_branch_depth"), &TreeGenerator::get_branch_depth);
 	ClassDB::bind_method(D_METHOD("set_distribution", "distribution"), &TreeGenerator::set_distribution);
@@ -45,9 +72,17 @@ void TreeGenerator::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_leaf_scale", "leaf_scale"), &TreeGenerator::set_leaf_scale);
 	ClassDB::bind_method(D_METHOD("get_leaf_scale"), &TreeGenerator::get_leaf_scale);
 	ClassDB::bind_method(D_METHOD("get_transforms"), &TreeGenerator::get_transforms);
-	ClassDB::bind_method(D_METHOD("gen", "w", "h", "home"), &TreeGenerator::gen);
+	ClassDB::bind_method(D_METHOD("gen", "w", "h", "home", "branch_id", "depth"), &TreeGenerator::gen);
 	ClassDB::bind_method(D_METHOD("add_tree_branch", "inf"), &TreeGenerator::add_tree_branch);
 	ClassDB::bind_method(D_METHOD("create_tree"), &TreeGenerator::create_tree);
+
+	// --- Variation parameters ---
+	ADD_GROUP("Variation", "");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "seed", PROPERTY_HINT_RANGE, "0,9999,1"), "set_seed", "get_seed");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "randomness", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_randomness", "get_randomness");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "curvature", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_curvature", "get_curvature");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_gravity", "get_gravity");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clump", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), "set_clump", "get_clump");
 
 	// --- Branching parameters ---
 	ADD_GROUP("Branches", "branch_");
@@ -114,7 +149,6 @@ void TreeGenerator::set_auto_split(float p_auto_split) {
 	}
 	splits = rebuilt;
 
-	update_parts();
 	_request_update();
 }
 
@@ -138,7 +172,6 @@ void TreeGenerator::set_splits(PackedVector3Array p_splits) {
 	}
 	splits = normalized;
 
-	update_parts();
 	_request_update();
 }
 
@@ -148,7 +181,6 @@ PackedVector3Array TreeGenerator::get_splits() const {
 
 void TreeGenerator::set_rotation(float p_rotation) {
 	rotation = p_rotation;
-	update_parts();
 	_request_update();
 }
 
@@ -203,7 +235,6 @@ float TreeGenerator::get_width() const {
 
 void TreeGenerator::set_radial_segments(int p_segments) {
 	radial_segments = p_segments;
-	update_parts();
 	_request_update();
 }
 
@@ -229,6 +260,51 @@ float TreeGenerator::get_leaf_scale() const {
 	return leaf_scale;
 }
 
+void TreeGenerator::set_seed(int p_seed) {
+	seed = p_seed;
+	_request_update();
+}
+
+int TreeGenerator::get_seed() const {
+	return seed;
+}
+
+void TreeGenerator::set_randomness(float p_randomness) {
+	randomness = p_randomness;
+	_request_update();
+}
+
+float TreeGenerator::get_randomness() const {
+	return randomness;
+}
+
+void TreeGenerator::set_curvature(float p_curvature) {
+	curvature = p_curvature;
+	_request_update();
+}
+
+float TreeGenerator::get_curvature() const {
+	return curvature;
+}
+
+void TreeGenerator::set_gravity(float p_gravity) {
+	gravity = p_gravity;
+	_request_update();
+}
+
+float TreeGenerator::get_gravity() const {
+	return gravity;
+}
+
+void TreeGenerator::set_clump(float p_clump) {
+	clump = p_clump;
+	_request_update();
+}
+
+float TreeGenerator::get_clump() const {
+	return clump;
+}
+
 Array TreeGenerator::get_transforms() {
 	if (!transforms.is_empty()) {
 		return transforms;
@@ -239,25 +315,90 @@ Array TreeGenerator::get_transforms() {
 	return transforms;
 }
 
-// Builds a single branch descriptor at the top of `home` with width `w` and
-// height `h`. The descriptor contains:
-//   - "branches": child branch descriptors (one per split)
-//   - "myTransform": the transform of this branch's own cylinder
-//   - "leaftransform": transform used to place leaves/flowers at this branch
-Dictionary TreeGenerator::gen(float w, float h, Transform3D home) const {
+// Builds a single branch descriptor at the top of `home` with width `w`,
+// height `h`, a deterministic branch ID, and the remaining recursion depth.
+// The descriptor contains:
+//   - "branches":      child branch descriptors (one per split)
+//   - "myTransform":   transform of this branch's own cylinder
+//   - "leaftransform": transform used to place leaves/flowers here
+//
+// Per-branch randomness is derived by hashing (seed ^ branch_id) so that:
+//   - Different seeds produce structurally different trees.
+//   - The same seed always produces exactly the same tree.
+//   - Each child of a branch gets a unique ID via a secondary hash of
+//     (branch_id * 37 + child_index), so siblings don't share values.
+//
+// Parameters applied per child branch:
+//   clump     — scales tilt toward 0 (branches grow more upright).
+//   curvature — random tilt perturbation that makes branches wander.
+//   randomness— random yaw jitter that shuffles azimuthal distribution.
+//   gravity   — rotates the tip toward world -Y, increasing with depth.
+Dictionary TreeGenerator::gen(float w, float h, Transform3D home, int p_branch_id, int p_depth) const {
 	Dictionary branch;
 	// Move to the top of the parent branch; children emanate from here.
 	Transform3D branch_origin = home.translated_local(Vector3(0.0, h, 0.0));
 
+	// Fraction of total depth consumed so far: 0 at root, 1 at tips.
+	// Gravity increases toward the tips so deep branches droop the most.
+	float depth_fraction = (branch_depth > 0)
+			? (1.0f - float(p_depth) / float(branch_depth))
+			: 0.0f;
+
 	branch["branches"] = Array{};
 	for (int i = 0; i < splits.size(); i++) {
-		Dictionary child;
+		// Unique deterministic ID for this child.
+		uint32_t child_id = _hash(uint32_t(p_branch_id) * 37u + uint32_t(i));
+
 		float position_along_trunk = float(i) / float(splits.size());
 		float bent_position = ((position_along_trunk - 0.5f) * distribution) + 0.5f;
 
-		child["tran"] = (branch_origin * Transform3D(branch_orientations[i]));
+		// --- Base orientation from the splits array ---
+		float tilt_angle = float(splits[i].x) * PI / 2.0f;
+		float yaw_angle = TAU * (position_along_trunk + rotation);
+
+		// Clumping: pull tilt toward 0 so branches grow more upright/bunched.
+		tilt_angle *= MAX(0.0f, 1.0f - clump);
+
+		// Curvature: random tilt perturbation making branches wander off-axis.
+		tilt_angle += _rand(child_id + 1u) * PI * 0.5f * curvature;
+
+		// Randomness: random yaw jitter shuffles branches around the azimuth.
+		yaw_angle += _rand(child_id + 2u) * TAU * randomness;
+
+		// Build the local orientation: tilt around +Z then yaw around +Y.
+		Transform3D orient = IDENTITY
+				.rotated(Vector3(0.0f, 0.0f, 1.0f), tilt_angle)
+				.rotated(Vector3(0.0f, 1.0f, 0.0f), yaw_angle);
+
+		// Compose with the parent's world transform to get the child's world transform.
+		Transform3D child_world = branch_origin * orient;
+
+		// Gravity: tilt the branch toward world -Y in world space.
+		// We rotate the world-space basis so the branch's up-axis droops downward,
+		// keeping the branch origin fixed. Depth fraction ensures tips droop more.
+		if (gravity > 0.0f) {
+			Vector3 branch_up = child_world.basis.get_column(1).normalized();
+			Vector3 world_down = Vector3(0.0f, -1.0f, 0.0f);
+			Vector3 gravity_axis = branch_up.cross(world_down);
+			float axis_len = gravity_axis.length();
+			if (axis_len > 0.001f) {
+				float gravity_amount = gravity * PI * 0.5f * depth_fraction;
+				Basis drooped = child_world.basis.rotated(gravity_axis / axis_len, gravity_amount);
+				child_world = Transform3D(drooped, child_world.origin);
+			}
+		}
+
+		// Parent alignment: snap yaw to the nearest radial segment face so the
+		// top ring of the parent cylinder aligns cleanly with the child's base.
+		float snapped = round((position_along_trunk + rotation) * float(radial_segments)) / float(radial_segments);
+		Transform3D parent_align = IDENTITY.rotated(Vector3(0.0f, 1.0f, 0.0f), TAU * snapped);
+
+		Dictionary child;
+		child["tran"] = child_world;
+		child["parent_align"] = parent_align;
 		child["w"] = sqrt((w * w) * radius_decay * (1.0f - bent_position));
 		child["h"] = sqrt(h * h * (1.0f - bent_position) * length_decay);
+		child["id"] = int(child_id); // Pass the unique ID down to the next level.
 		Array(branch["branches"]).append(child);
 	}
 
@@ -272,8 +413,8 @@ Dictionary TreeGenerator::gen(float w, float h, Transform3D home) const {
 
 // Recursively expands a branch descriptor into flat arrays of tree transforms,
 // leaf transforms, and parent transforms. `inf` is a Dictionary with keys:
-//   - "b": the branch descriptor (from gen())
-//   - "d": remaining recursion depth
+//   - "b":      the branch descriptor (from gen())
+//   - "d":      remaining recursion depth
 //   - "parent": the parent alignment transform
 Dictionary TreeGenerator::add_tree_branch(Dictionary inf) const {
 	Array leaf_transforms;
@@ -288,12 +429,16 @@ Dictionary TreeGenerator::add_tree_branch(Dictionary inf) const {
 		Array children = Dictionary(inf["b"])["branches"];
 		for (int child_index = 0; child_index < children.size(); child_index++) {
 			Dictionary child = children[child_index];
-			Dictionary child_branch = gen(child["w"], child["h"], child["tran"]);
+			int child_id = int(child["id"]);
+			Dictionary child_branch = gen(child["w"], child["h"], child["tran"], child_id, remaining_depth - 1);
 
 			// Only recurse into branches that are thick enough to be visible.
 			if (float(child["w"]) > 0.1f) {
+				// Parent alignment stored per-child in gen() aligns the parent's
+				// top ring to the child's azimuthal position.
+				child_branch["parent"] = branch_transform * Transform3D(Dictionary(child)["parent_align"]);
+
 				Dictionary recursion_input;
-				child_branch["parent"] = branch_transform * Transform3D(parent_alignments[child_index]);
 				recursion_input["b"] = child_branch;
 				recursion_input["d"] = remaining_depth - 1;
 
@@ -334,10 +479,10 @@ Dictionary TreeGenerator::add_tree_branch(Dictionary inf) const {
 }
 
 Dictionary TreeGenerator::create_tree() const {
-	// Generate the root branch from the trunk parameters.
-	Dictionary root_branch = gen(width, height, Transform3D());
+	// ID 0 for the root; children derive their IDs via _hash(parent_id * 37 + i).
+	Dictionary root_branch = gen(width, height, Transform3D(), 0, branch_depth);
 
-	// The root's "parent" is a dummy transform used for the base of the trunk.
+	// The root's "parent" is a dummy transform anchoring the base of the trunk.
 	root_branch["parent"] = Transform3D().scaled(Vector3(width, height, width)).translated(Vector3(0, -0.5, 0));
 
 	Dictionary input;
@@ -345,33 +490,6 @@ Dictionary TreeGenerator::create_tree() const {
 	input["d"] = branch_depth;
 
 	return add_tree_branch(input);
-}
-
-// Rebuilds the per-split orientation and parent-alignment transforms from the
-// current splits, rotation, and radial_segments. Called whenever any of those
-// parameters change.
-void TreeGenerator::update_parts() {
-	branch_orientations = Array();
-	parent_alignments = Array();
-
-	for (int i = 0; i < splits.size(); i++) {
-		float position_along_trunk = float(i) / float(splits.size());
-
-		// Each child branch is tilted by its split angle (x) around Z, then
-		// rotated around Y to distribute children around the trunk.
-		float tilt_angle = float(splits[i].x) * PI / 2.0f;
-		float yaw_angle = TAU * (position_along_trunk + rotation);
-		branch_orientations.append(
-				IDENTITY.rotated(Vector3(0.0, 0.0, 1.0), tilt_angle)
-						.rotated(Vector3(0.0, 1.0, 0.0), yaw_angle));
-
-		// The parent alignment snaps each child to the nearest radial segment
-		// so the top of the parent cylinder meets the child cleanly.
-		float snapped_position = round((position_along_trunk + rotation) * float(radial_segments)) / float(radial_segments);
-		float align_angle = TAU * snapped_position;
-		parent_alignments.append(
-				IDENTITY.rotated(Vector3(0, 1, 0), align_angle));
-	}
 }
 
 // Builds the trunk/branch mesh geometry into `p_arr` from the tree data in

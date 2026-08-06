@@ -22,11 +22,20 @@ private:
 	float distribution = 0.5; // Bends split positions toward the trunk center.
 	float auto_split = 0.5; // Auto-generated split angle for each branch.
 	PackedVector3Array splits = PackedVector3Array(); // Per-split control vectors (x=angle, y=weight, z=unused).
-	Array branch_orientations; // Per-split orientation transform applied to each child branch.
-	Array parent_alignments; // Per-split transform aligning a parent's top to its child.
 	float rotation = 0; // Rotates the whole branch arrangement around the trunk.
 	float radius_decay = 1.0; // How quickly child branch radius shrinks.
 	float length_decay = 0.5; // How quickly child branch length shrinks.
+
+	// --- Variation parameters ---
+	int seed = 0; // RNG seed; changing this produces a different tree shape.
+	float randomness = 0.2f; // Random yaw jitter applied to each branch (0=none, 1=full circle).
+	float curvature = 0.2f; // Random tilt perturbation per branch, making branches wander.
+	float gravity = 0.3f; // How strongly branch tips droop toward world -Y (0=none, 1=heavy droop).
+	float clump = 0.0f; // Pulls branches upright; 0=natural spread, 1=fully clumped/upright.
+
+	// --- PRNG helpers ---
+	static uint32_t _hash(uint32_t x); // Integer hash for deterministic randomness.
+	float _rand(uint32_t id) const; // Returns a value in [-1, 1] deterministically from seed+id.
 
 	// --- Trunk parameters ---
 	float radius = 0.1; // Base trunk radius.
@@ -45,6 +54,16 @@ protected:
 	void _create_mesh_array(Array &p_arr, const Dictionary &p_tr) const override;
 
 public:
+	void set_seed(int p_seed);
+	int get_seed() const;
+	void set_randomness(float p_randomness);
+	float get_randomness() const;
+	void set_curvature(float p_curvature);
+	float get_curvature() const;
+	void set_gravity(float p_gravity);
+	float get_gravity() const;
+	void set_clump(float p_clump);
+	float get_clump() const;
 	void set_branch_depth(int p_branch_depth);
 	int get_branch_depth() const;
 	void set_distribution(float p_distribution);
@@ -77,8 +96,7 @@ public:
 	void set_transforms(const Array p_transforms);
 	Array get_transforms();
 
-	void update_parts();
-	Dictionary gen(float w, float h, Transform3D home) const;
+	Dictionary gen(float w, float h, Transform3D home, int p_branch_id, int p_depth) const;
 	Dictionary add_tree_branch(Dictionary inf) const;
 	Dictionary create_tree() const override;
 
